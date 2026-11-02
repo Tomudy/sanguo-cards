@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>三国武将 · 亲子对战</title>
+<style>
+:root{
+  --wei:#2E5C8A;--shu:#3B7A3B;--wu:#B03A2E;--qun:#9A7B0A;--shen:#6D4C9F;
+  --paper:#FBF6EA;--ink:#3B332A;--line:#D8D3C6;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#EDEAE3;font-family:"Microsoft YaHei","PingFang SC",sans-serif;color:var(--ink);
+  -webkit-user-select:none;user-select:none;overflow-x:hidden;}
+.wrap{max-width:760px;margin:0 auto;padding:12px;}
+h1{font-size:18px;margin-bottom:4px;}
+.sub{font-size:12px;color:#8a857a;margin-bottom:12px;line-height:1.7;}
+
+/* 选将 */
+.picks{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;}
+.pick{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:8px;cursor:pointer;
+  text-align:center;transition:transform .12s;position:relative;}
+.pick:hover{transform:translateY(-3px);border-color:#999;}
+.pick.on{border:2px solid #31597E;background:#fff;}
+/* 花色 + 战力点数角标（扑克牌质感） */
+.corner{position:absolute;line-height:1.05;font-weight:700;text-align:center;pointer-events:none;}
+.corner .suit{font-size:15px;display:block;}
+.corner .num{font-size:13px;display:block;font-family:"KaiTi",serif;}
+.corner.tl{left:6px;top:5px;}
+.corner.br{right:6px;bottom:5px;transform:rotate(180deg);}
+.corner.red{color:#B03A2E;}
+.corner.black{color:#3B332A;}
+.corner.shen{color:#6D4C9F;}
+.corner.shi{color:#C86A27;}
+.legend{font-size:12px;color:#6b665c;background:var(--paper);border:1px dashed var(--line);
+  border-radius:8px;padding:6px 10px;margin-bottom:8px;line-height:1.7;}
+.legend b.black{color:#3B332A;}
+.legend b.red{color:#B03A2E;}
+.pick img{width:100%;height:110px;object-fit:cover;object-position:center 12%;border-radius:8px;}
+.pick .pn{font-family:"KaiTi",serif;font-weight:700;font-size:14px;margin:6px 0 2px;}
+.pick .pf{font-size:11px;color:#8a857a;}
+.pick .ps{font-size:10px;color:#6b665c;margin-top:4px;line-height:1.4;text-align:left;}
+.rowbtn{display:flex;gap:10px;margin:14px 0;flex-wrap:wrap;align-items:center;}
+button{padding:8px 16px;border-radius:8px;border:1px solid #c3beb0;background:#fff;font-size:14px;cursor:pointer;}
+button:hover{background:#f2efe6;}
+button.pri{background:#31597E;color:#fff;border-color:#31597E;}
+button.pri:hover{background:#274a6b;}
+button:disabled{opacity:.4;cursor:not-allowed;}
+
+/* 战场 */
+.board{display:none;}
+.side{display:flex;gap:10px;align-items:center;background:var(--paper);border:1px solid var(--line);
+  border-radius:12px;padding:10px;position:relative;}
+.side.act{border-color:#31597E;box-shadow:0 0 0 2px rgba(49,89,126,.15);}
+.face{width:64px;height:64px;border-radius:10px;object-fit:cover;object-position:center 12%;flex:none;background:#EFE6D2;}
+.info{flex:1;min-width:0;}
+.iname{font-family:"KaiTi",serif;font-weight:700;font-size:15px;}
+.imeta{font-size:11px;color:#8a857a;margin-top:2px;}
+.iskill{font-size:11px;color:#6b665c;margin-top:4px;line-height:1.5;}
+.iskill b{color:#4a453a;font-weight:700;}
+.iskill .locked-tag{color:#8a857a;font-size:10px;}
+.hp{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;}
+.pip{width:16px;height:16px;border-radius:50%;background:#C0392B;border:1px solid #8e2b20;}
+.pip.off{background:transparent;border-color:#c9c3b4;}
+.hnum{font-size:12px;color:#8a857a;margin-left:4px;}
+.handcnt{font-size:12px;color:#6b665c;}
+.float{position:absolute;right:14px;top:8px;font-size:22px;font-weight:700;color:#C0392B;opacity:0;
+  pointer-events:none;}
+.float.go{animation:fly 1s ease-out;}
+@keyframes fly{0%{opacity:1;transform:translateY(0);}100%{opacity:0;transform:translateY(-26px);}}
+
+.logwrap{background:#fff;border:1px solid var(--line);border-radius:12px;margin:10px 0;height:132px;
+  overflow-y:auto;padding:8px 12px;font-size:12.5px;line-height:1.85;}
+.logwrap div{border-bottom:1px dashed #eee;padding:1px 0;}
+.logwrap .me{color:#31597E;}
+.logwrap .op{color:#8a4b2a;}
+
+.myhand{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px;min-height:96px;}
+.cards{display:flex;gap:8px;flex-wrap:wrap;}
+.card{border-radius:10px;padding:8px 10px;min-width:62px;text-align:center;cursor:pointer;
+  border:1px solid #c3beb0;background:#fff;font-size:13px;line-height:1.3;}
+.card:hover{transform:translateY(-2px);}
+.card.sel{border:2px solid #31597E;}
+.card.slash{color:#B03A2E;} .card.dodge{color:#2E5C8A;} .card.peach{color:#B84B6B;} .card.wzsy{color:#9A7B0A;}
+.card small{display:block;font-size:10px;color:#8a857a;margin-top:2px;}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.tip{font-size:12px;color:#8a4b2a;background:#FBEEE6;border-radius:8px;padding:6px 10px;margin-top:8px;}
+.ov{display:none;position:fixed;inset:0;background:rgba(30,28,24,.55);align-items:center;justify-content:center;}
+.ov.on{display:flex;}
+.ovbox{background:var(--paper);border-radius:16px;padding:24px 30px;text-align:center;min-width:240px;}
+.ovbox h2{font-size:20px;margin-bottom:8px;}
+.ovbox p{font-size:13px;color:#6b665c;margin-bottom:14px;}
+.mute{float:right;font-size:12px;color:#8a857a;cursor:pointer;}
+
+/* ===== 触屏与响应式适配（iPad / 手机） ===== */
+html{-webkit-text-size-adjust:100%;}
+body{touch-action:manipulation;}            /* 去掉双击缩放延迟，点牌更跟手 */
+button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+.pick,.card{-webkit-tap-highlight-color:transparent;}
+@media (hover:none){                         /* 触屏没有 hover，避免点完卡在浮起态 */
+  .pick:hover{transform:none;border-color:var(--line);}
+  .pick.on{border-color:#31597E;}
+  .card:hover{transform:none;}
+}
+
+/* iPad 竖屏 / 小平板：略收紧 */
+@media screen and (max-width:900px){
+  .wrap{max-width:100%;padding:10px;}
+  .picks{grid-template-columns:repeat(auto-fit,minmax(112px,1fr));}
+}
+
+/* 手机：全面紧凑 + 大触点；选将固定 3 列，避免 auto-fit 在某些 WebView 算错容器宽 */
+@media screen and (max-width:640px){
+  .wrap{padding:8px;}
+  h1{font-size:16px;line-height:1.5;}
+  h1 .mute{float:none;display:inline-block;margin-left:10px;padding:4px 2px;}
+  .sub{font-size:11.5px;}
+  .legend{font-size:11px;padding:5px 8px;}
+  .picks{grid-template-columns:repeat(3,1fr);gap:8px;}
+  .pick{padding:6px;border-radius:10px;min-width:0;}
+  .pick img{height:92px;}
+  .pick .pn{font-size:13px;}
+  .corner .suit{font-size:13px;}
+  .corner .num{font-size:12px;}
+  .rowbtn{gap:8px;margin:10px 0;}
+  button{padding:10px 14px;min-height:40px;font-size:14px;}   /* 触屏最小触点 */
+  .side{padding:8px;gap:8px;align-items:flex-start;}
+  .face{width:50px;height:50px;border-radius:8px;}
+  .iname{font-size:14px;}
+  .imeta{font-size:10.5px;}
+  .iskill{font-size:10.5px;}
+  .pip{width:13px;height:13px;}
+  .handcnt{font-size:11px;flex:none;}
+  .float{right:8px;top:4px;font-size:19px;}
+  .logwrap{height:104px;font-size:12px;margin:8px 0;}
+  .myhand{padding:8px;min-height:84px;}
+  .cards{gap:6px;}
+  .card{min-width:52px;padding:8px 7px;font-size:12.5px;}
+  .card small{font-size:9.5px;}
+  .acts{gap:6px;}
+  .ovbox{min-width:0;width:86%;padding:20px 18px;}
+}
+
+/* 超小屏（旧手机横屏等）：选将改 2 列，卡片文字不挤 */
+@media screen and (max-width:360px){
+  .picks{grid-template-columns:repeat(2,1fr);}
+  .pick img{height:96px;}
+}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>三国武将 · 亲子对战
+    <span class="mute" onclick="toggleMute()">🔊 音效：<span id="muteTxt">开</span></span>
+    <span class="mute" style="margin-right:10px;" onclick="toggleBgm()">🥁 战鼓：<span id="bgmTxt">关</span></span>
+  </h1>
+  <p class="sub">简化规则：只有【杀】【闪】【桃】【无中生有】四种牌。每回合摸 2 张 → 出牌 → 手牌超过体力上限要弃。<br>
+  出杀次数：小将军 2 次、张飞 2 次、神姜维 3 次，其余武将 1 次；每回合只能吃 1 张【桃】。<br>
+  <b style="color:#B03A2E;">濒死规则</b>：体力被打到 0 时不立即判负，而是进入濒死 —— 你可以打出一张【桃】救回自己（体力回到 1 点，濒死求桃不受"每回合 1 张"限制）；
+  自己没有桃时，对手可以选择出桃相救。无人施救才真正阵亡。60 轮未分胜负判和。</p>
+
+  <div id="setup">
+    <p style="font-size:13px;margin-bottom:8px;">1. 选你的武将（点一下选中，可换人）</p>
+    <p class="legend">
+      卡角花色 = 势力：<b class="black">♠ 魏</b> · <b class="red">♥ 蜀</b> · <b class="black">♣ 吴</b> ·
+      <b class="red">♦ 群</b> · <b style="color:#6D4C9F;">★ 神</b> · <b style="color:#C86A27;">◆ 势</b><br>
+      卡角数字 = <b>战力点数 1–13</b>（综合体力、输出、生存、过牌）。
+      父子对战想势均力敌，就挑点数相近的；想挑战 Boss 就选神将/势将。</p>
+    <div class="picks" id="picks"></div>
+    <div class="rowbtn">
+      <span style="font-size:13px;">对手：</span>
+      <button onclick="setMode('ai')" id="btnAi">电脑</button>
+      <button onclick="setMode('pvp')" id="btnPvp">爸爸/同学（同机轮流）</button>
+      <button class="pri" onclick="startGame()">开始对战</button>
+    </div>
+  </div>
+
+  <div class="board" id="board">
+    <div class="side" id="sideTop"></div>
+    <div class="logwrap" id="log"></div>
+    <div class="side" id="sideBot"></div>
+    <div class="myhand">
+      <div id="handLabel" style="font-size:12px;color:#8a857a;margin-bottom:6px;">手牌</div>
+      <div class="cards" id="hand"></div>
+    </div>
+    <div class="acts" id="acts"></div>
+    <div class="tip" id="tip"></div>
+    <div style="margin-top:10px;"><button onclick="backSetup()">返回选将</button></div>
+  </div>
+</div>
+
+<div class="ov" id="ov"><div class="ovbox">
+  <h2 id="ovTitle"></h2><p id="ovText"></p>
+  <button class="pri" onclick="again()">再来一局</button>
+</div></div>
+
+<script id="engine">
+/* ========== 纯逻辑引擎（不碰 DOM，可被 Node 直接加载测试） ========== */
+var SG = (function(){
+  var CARDS = { slash:'杀', dodge:'闪', peach:'桃', wzsy:'无中生有' };
+
+  var HEROES = [
+    { id:'boy', name:'小将军', faction:'shu', hp:4, power:9, handBonus:1, slashLimit:2,
+      skills:[{id:'ruiqi',name:'锐气',kind:'active',desc:'出牌阶段限一次，你可以弃置一张牌，然后摸两张牌。'},
+              {id:'shao_nian_zhi',name:'少年志',kind:'locked',desc:'锁定技，你的手牌上限 +1，且你出牌阶段可使用【杀】的次数 +1。'}] },
+    { id:'baiyu', name:'白羽先生', faction:'wei', hp:3, power:7, handBonus:0, slashLimit:1,
+      skills:[{id:'yusuan',name:'羽算',kind:'active',desc:'摸牌阶段，你可以多摸三张牌，然后弃置其中一张。'},
+              {id:'jinglan',name:'静澜',kind:'locked',desc:'每回合限一次，当你成为【杀】的目标时，你可以弃置一张基本牌，令此【杀】无效。'}] },
+    { id:'qingluan', name:'青鸾', faction:'wu', hp:3, power:6, handBonus:0, slashLimit:1,
+      skills:[{id:'chuanyang',name:'穿杨',kind:'locked',desc:'锁定技，当你的【杀】造成伤害后，你摸一张牌。'},
+              {id:'jinghong',name:'惊鸿',kind:'active',desc:'当你使用【闪】抵消【杀】后，你可以对使用者造成 1 点伤害。'}] },
+    { id:'gushan', name:'虎痴·关山', faction:'qun', hp:4, power:8, handBonus:0, slashLimit:1,
+      skills:[{id:'mengli',name:'猛力',kind:'locked',desc:'锁定技，你每回合使用的第一张【杀】伤害 +1。'},
+              {id:'douzhi',name:'斗志',kind:'locked',desc:'锁定技，当你受到伤害后，你摸一张牌。'}] },
+    { id:'lvbu', name:'吕布', faction:'qun', hp:4, power:9, handBonus:0, slashLimit:1,
+      skills:[{id:'wushuang',name:'无双',kind:'locked',desc:'锁定技，你使用【杀】时，对方需使用两张【闪】才能抵消。'},
+              {id:'xiaohu',name:'虓虎',kind:'locked',desc:'锁定技，你每回合使用的第一张【杀】伤害 +1。'}] },
+    { id:'zhaoyun', name:'赵云', faction:'shu', hp:4, power:8, handBonus:1, slashLimit:1,
+      skills:[{id:'longdan',name:'龙胆',kind:'locked',desc:'锁定技，你可以将【杀】当【闪】、【闪】当【杀】使用。'},
+              {id:'yajiao',name:'涯角',kind:'locked',desc:'锁定技，你的手牌上限 +1。'}] },
+    { id:'zhugeliang', name:'诸葛亮', faction:'shu', hp:3, power:7, handBonus:1, slashLimit:1,
+      skills:[{id:'kongcheng',name:'空城',kind:'locked',desc:'锁定技，若你没有手牌，你不能成为【杀】的目标。'},
+              {id:'guanxing',name:'观星',kind:'locked',desc:'锁定技，你的摸牌阶段多摸一张牌，且手牌上限 +1。'}] },
+    { id:'diaochan', name:'貂蝉', faction:'qun', hp:3, power:6, handBonus:0, slashLimit:1,
+      skills:[{id:'lijian',name:'离间',kind:'active',desc:'出牌阶段限一次，你可以弃置一张手牌，令对方弃置两张手牌。'},
+              {id:'biyue',name:'闭月',kind:'locked',desc:'锁定技，你的摸牌阶段多摸一张牌。'}] },
+    { id:'guanyu', name:'关羽', faction:'shu', hp:4, power:9, handBonus:1, slashLimit:1,
+      skills:[{id:'wusheng',name:'武圣',kind:'locked',desc:'锁定技，每回合限一次，你使用的第一张【杀】不可被【闪】抵消，且伤害 +1。'},
+              {id:'yishi',name:'义释',kind:'locked',desc:'锁定技，你的手牌上限 +1。'}] },
+    { id:'zhangfei', name:'张飞', faction:'shu', hp:4, power:10, handBonus:0, slashLimit:2,
+      skills:[{id:'paoxiao',name:'咆哮',kind:'locked',desc:'锁定技，你出牌阶段可使用【杀】的次数 +1。'},
+              {id:'baohe',name:'暴喝',kind:'locked',desc:'锁定技，当你的【杀】造成伤害后，对方弃置一张手牌。'}] },
+    { id:'machao', name:'马超', faction:'shu', hp:4, power:10, handBonus:0, slashLimit:1,
+      skills:[{id:'tieji',name:'铁骑',kind:'locked',desc:'锁定技，你使用【杀】造成的伤害 +1。'},
+              {id:'xiliang',name:'西凉',kind:'locked',desc:'锁定技，你的摸牌阶段多摸一张牌。'}] },
+    { id:'jiangwei', name:'神姜维', faction:'shen', hp:4, power:13, handBonus:1, slashLimit:3,
+      skills:[{id:'jiufa',name:'九伐',kind:'locked',desc:'锁定技，你出牌阶段可使用【杀】的次数上限为 3。'},
+              {id:'jizhi',name:'继志',kind:'locked',desc:'锁定技，你的手牌上限 +1。'},
+              {id:'danlie',name:'胆烈',kind:'locked',desc:'每局游戏限一次，当你的体力值变为 1 时，你摸三张牌。'}] },
+    { id:'weiyan', name:'势魏延', faction:'shi', hp:4, power:12, handBonus:0, slashLimit:1,
+      skills:[{id:'qimou',name:'奇谋',kind:'active',desc:'出牌阶段限一次，你可以弃置一张手牌，对对方造成 1 点伤害。'},
+              {id:'yonglie',name:'勇烈',kind:'locked',desc:'锁定技，你每回合使用的第一张【杀】伤害 +1。'}] },
+    { id:'zhouyu', name:'势周瑜', faction:'shi', hp:4, power:11, handBonus:0, slashLimit:1,
+      skills:[{id:'yehuo',name:'业火',kind:'active',desc:'出牌阶段限一次，你可以弃置两张手牌，对对方造成 2 点伤害。'},
+              {id:'guqu',name:'顾曲',kind:'locked',desc:'锁定技，你的摸牌阶段多摸一张牌。'}] },
+    { id:'dengai', name:'势邓艾', faction:'shi', hp:4, power:11, handBonus:1, slashLimit:1,
+      skills:[{id:'zaoxian',name:'凿险',kind:'locked',desc:'锁定技，当你的【杀】造成伤害后，本回合你使用【杀】的次数 +1。'},
+              {id:'yinping',name:'阴平',kind:'locked',desc:'锁定技，你的手牌上限 +1。'}] }
+  ];
+
+  function rngFrom(seed){
+    var a = seed >>> 0;
+    return function(){
+      a = (a + 0x6D2B79F5) >>> 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function buildDeck(){
+    var d = [];
+    var i;
+    for(i=0;i<20;i++) d.push('slash');
+    for(i=0;i<12;i++) d.push('dodge');
+    for(i=0;i<6;i++) d.push('peach');
+    for(i=0;i<6;i++) d.push('wzsy');
+    return d;
+  }
+
+  function shuffle(arr, rnd){
+    for(var i=arr.length-1;i>0;i--){
+      var j = Math.floor(rnd()*(i+1));
+      var t = arr[i]; arr[i]=arr[j]; arr[j]=t;
+    }
+    return arr;
+  }
+
+  function newGame(opts){
+    var rnd = rngFrom(opts.seed || (Date.now() & 0xffffff));
+    var h0 = hero(opts.p0), h1 = hero(opts.p1 || 'jiangwei');
+    var st = {
+      rnd: rnd, deck: shuffle(buildDeck(), rnd), discard: [],
+      turn: 0, round: 1, winner: null, over: false, overReason: '',
+      log: [], events: [], awaiting: null, selected: [],
+      slashUsed: 0,
+      p: [
+        { idx:0, hero:h0, hp:h0.hp, maxHp:h0.hp, hand:[], used:{}, name:h0.name, dying:false },
+        { idx:1, hero:h1, hp:h1.hp, maxHp:h1.hp, hand:[], used:{}, name:h1.name, dying:false }
+      ]
+    };
+    draw(st, 0, 4); draw(st, 1, 4);
+    say(st, '对局开始：' + h0.name + ' vs ' + h1.name);
+    beginTurn(st);
+    return st;
+  }
+
+  function hero(id){
+    for(var i=0;i<HEROES.length;i++) if(HEROES[i].id===id) return HEROES[i];
+    return HEROES[0];
+  }
+
+  function say(st, txt, who){
+    st.log.push({ t:txt, who:(who===undefined ? -1 : who) });
+    if(st.log.length > 120) st.log.shift();
+  }
+
+  function maxHand(st, p){ return Math.max(0, st.p[p].hp) + st.p[p].hero.handBonus; }
+
+  function draw(st, p, n){
+    for(var i=0;i<n;i++){
+      if(!st.deck.length){
+        if(!st.discard.length) return;
+        st.deck = shuffle(st.discard, st.rnd); st.discard = [];
+        say(st, '牌堆耗尽，弃牌堆重新洗入。');
+      }
+      if(!st.deck.length) return;
+      st.p[p].hand.push(st.deck.pop());
+    }
+  }
+
+  function beginTurn(st){
+    var p = st.turn;
+    st.slashUsed = 0;
+    st.slashBonus = 0;
+    st.p[p].used = st.p[p].used || {};
+    st.p[p].used.ruiqi = false;
+    st.p[p].used.jinglan = false;
+    st.p[p].used.jinghong = false;
+    st.p[p].used.peach = false;
+    st.p[p].used.qimou = false;
+    st.p[p].used.yehuo = false;
+    st.p[p].used.lijian = false;
+    st.p[p].used.wusheng = false;
+    if(has(st.p[p], 'yusuan')){
+      st.awaiting = { p:p, type:'yusuan' };
+      return;
+    }
+    doDrawPhase(st);
+  }
+
+  function doDrawPhase(st){
+    var p = st.turn;
+    var n = (has(st.p[p],'guqu') || has(st.p[p],'guanxing') || has(st.p[p],'biyue') || has(st.p[p],'xiliang')) ? 3 : 2;
+    draw(st, p, n);
+    st.events.push({ type:'draw', p:p });
+    say(st, st.p[p].name + ' 摸 ' + n + ' 张牌。', p);
+    st.awaiting = null;
+    st.phase = 'play';
+  }
+
+  function doYusuan(st, use){
+    var p = st.turn;
+    if(use){
+      draw(st, p, 3);
+      say(st, st.p[p].name + ' 发动【羽算】，摸 3 张后保留 2 张。', p);
+      st.awaiting = { p:p, type:'keep', n:2 };
+    } else {
+      doDrawPhase(st);
+    }
+  }
+
+  function has(pl, sid){
+    for(var i=0;i<pl.hero.skills.length;i++) if(pl.hero.skills[i].id===sid) return true;
+    return false;
+  }
+
+  function active(st){
+    if(st.awaiting) return st.awaiting.p;
+    return st.turn;
+  }
+
+  function canAct(st){
+    return !st.over && !st.awaiting && st.phase === 'play';
+  }
+
+  function legal(st){
+    var out = { slash:false, peach:false, wzsy:false, ruiqi:false, end:true };
+    if(!canAct(st)) return out;
+    var p = st.turn, h = st.p[p].hand;
+    var opp = 1 - p, oppBlocked = has(st.p[opp],'kongcheng') && st.p[opp].hand.length === 0;
+    out.slash = (h.indexOf('slash') >= 0 || (has(st.p[p],'longdan') && h.indexOf('dodge') >= 0)) &&
+                st.slashUsed < st.p[p].hero.slashLimit + (st.slashBonus || 0) && !oppBlocked;
+    out.lijian = has(st.p[p],'lijian') && !st.p[p].used.lijian && h.length > 0 && st.p[opp].hand.length > 0;
+    out.peach = h.indexOf('peach') >= 0 && st.p[p].hp < st.p[p].maxHp && !st.p[p].used.peach;
+    out.wzsy = h.indexOf('wzsy') >= 0;
+    out.ruiqi = has(st.p[p], 'ruiqi') && !st.p[p].used.ruiqi && h.length > 0;
+    out.qimou = has(st.p[p], 'qimou') && !st.p[p].used.qimou && h.length > 0;
+    out.yehuo = has(st.p[p], 'yehuo') && !st.p[p].used.yehuo && h.length >= 2;
+    return out;
+  }
+
+  function discardCard(st, p, idx){
+    var c = st.p[p].hand.splice(idx,1)[0];
+    st.discard.push(c);
+    return c;
+  }
+
+  function doSlash(st){
+    var p = st.turn, h = st.p[p].hand, t = 1-p;
+    if(has(st.p[t],'kongcheng') && st.p[t].hand.length === 0){
+      say(st, st.p[t].name + ' 使出【空城】——手中无牌，无法成为【杀】的目标！', t);
+      st.events.push({ type:'dodge', p:t });
+      return;
+    }
+    var i = h.indexOf('slash');
+    var asDodge = false;
+    if(i < 0 && has(st.p[p],'longdan')){ i = h.indexOf('dodge'); asDodge = true; }
+    if(i < 0) return;
+    discardCard(st, p, i);
+    st.slashUsed++;
+    var dmg = 1;
+    if((has(st.p[p],'mengli') || has(st.p[p],'yonglie') || has(st.p[p],'xiaohu')) && st.slashUsed === 1) dmg = 2;
+    if(has(st.p[p],'tieji')) dmg = 2;
+    var noDodge = false;
+    if(has(st.p[p],'wusheng') && !st.p[p].used.wusheng){
+      st.p[p].used.wusheng = true;
+      noDodge = true;
+      dmg = Math.max(dmg, 2);
+    }
+    st.events.push({ type:'slash', p:p, dmg:dmg });
+    say(st, st.p[p].name + ' 对 ' + st.p[1-p].name + ' 使用【杀】' + (dmg>1?'（伤害 +1）':'') + '。', p);
+    askDodge(st, 1-p, p, dmg, true, noDodge);
+  }
+
+  function askDodge(st, target, from, dmg, chain, noDodge){
+    if(noDodge){
+      st.events.push({ type:'skill', p:from });
+      say(st, st.p[from].name + ' 发动【武圣】——这一刀势如破竹，无法闪避！', from);
+    }
+    var need = has(st.p[from],'wushuang') ? 2 : 1;
+    var hasDodge = !noDodge && (st.p[target].hand.indexOf('dodge') >= 0 ||
+      (has(st.p[target],'longdan') && st.p[target].hand.indexOf('slash') >= 0));
+    var jl = false;
+    if(has(st.p[target],'jinglan') && !st.p[target].used.jinglan){
+      for(var i=0;i<st.p[target].hand.length;i++){
+        var c = st.p[target].hand[i];
+        if(c==='slash'||c==='dodge'||c==='peach'){ jl = i; break; }
+      }
+    }
+    if(jl !== false){
+      st.awaiting = { p:target, type:'jinglan', cardIdx:jl, from:from, dmg:dmg, chain:chain };
+      return;
+    }
+    st.awaiting = { p:target, type:'dodge', from:from, dmg:dmg, chain:chain, canDodge:hasDodge, need:need, noDodge:!!noDodge };
+  }
+
+  function resolveDodge(st, useDodge){
+    var a = st.awaiting, t = a.p, f = a.from;
+    if(useDodge){
+      var i = st.p[t].hand.indexOf('dodge');
+      if(i < 0 && has(st.p[t],'longdan')) i = st.p[t].hand.indexOf('slash');
+      discardCard(st, t, i);
+      st.events.push({ type:'dodge', p:t });
+      if(a.need && a.need > 1){
+        say(st, st.p[t].name + ' 使用【闪】挡下第一刀，但【无双】余威犹在，还需再出一张【闪】！', t);
+        var can = st.p[t].hand.indexOf('dodge') >= 0 || (has(st.p[t],'longdan') && st.p[t].hand.indexOf('slash') >= 0);
+        st.awaiting = { p:t, type:'dodge', from:f, dmg:a.dmg, chain:a.chain, need:a.need-1, canDodge:can };
+        return;
+      }
+      say(st, st.p[t].name + ' 使用【闪】抵消了这次【杀】。', t);
+      if(has(st.p[t],'jinghong')){
+        st.awaiting = { p:t, type:'jinghong' };
+        return;
+      }
+      st.awaiting = null;
+      afterAction(st);
+      return;
+    }
+    st.awaiting = null;
+    dealDamage(st, t, a.dmg, f);
+    if(!st.over){
+      if(has(st.p[f],'chuanyang')){
+        draw(st, f, 1);
+        say(st, st.p[f].name + ' 发动【穿杨】，摸 1 张牌。', f);
+      }
+      if(has(st.p[f],'zaoxian')){
+        st.slashBonus = (st.slashBonus || 0) + 1;
+        say(st, st.p[f].name + ' 发动【凿险】，本回合出【杀】次数 +1。', f);
+      }
+      if(has(st.p[f],'baohe') && st.p[t].hand.length > 0){
+        /* 暴喝：自动弃掉对方一张防守价值最高的手牌 */
+        var prio = { dodge:0, wzsy:1, slash:2, peach:3 };
+        var bi = 0, bv = 9;
+        for(var k=0;k<st.p[t].hand.length;k++){
+          var v = prio[st.p[t].hand[k]];
+          if(v < bv){ bv = v; bi = k; }
+        }
+        var dropped = discardCard(st, t, bi);
+        st.events.push({ type:'skill', p:f });
+        say(st, st.p[f].name + ' 一声【暴喝】声如巨雷，' + st.p[t].name + ' 弃置了【' + CARDS[dropped] + '】！', f);
+      }
+      afterAction(st);
+    }
+  }
+
+  function resolveJinglan(st, use){
+    var a = st.awaiting, t = a.p;
+    st.p[t].used.jinglan = true;
+    if(use){
+      var c = discardCard(st, t, a.cardIdx);
+      say(st, st.p[t].name + ' 发动【静澜】，弃置【' + CARDS[c] + '】，此【杀】无效。', t);
+      st.awaiting = null;
+      afterAction(st);
+      return;
+    }
+    st.awaiting = { p:t, type:'dodge', from:a.from, dmg:a.dmg, chain:a.chain,
+                    canDodge:st.p[t].hand.indexOf('dodge') >= 0 };
+  }
+
+  function doJinghong(st, use){
+    var a = st.awaiting, t = a.p, from = st.turn;
+    st.p[t].used.jinghong = true;
+    if(use){
+      st.events.push({ type:'skill', p:t });
+      say(st, st.p[t].name + ' 发动【惊鸿】，反手一箭！', t);
+      st.awaiting = null;
+      dealDamage(st, from, 1, t);
+      if(!st.over) afterAction(st);
+      return;
+    }
+    st.awaiting = null;
+    afterAction(st);
+  }
+
+  function dealDamage(st, t, n, from){
+    st.p[t].hp -= n;
+    st.events.push({ type:'damage', p:t, n:n });
+    say(st, st.p[t].name + ' 失去 ' + n + ' 点体力（剩余 ' + Math.max(0,st.p[t].hp) + '）。', t);
+    if(has(st.p[t],'douzhi')){
+      draw(st, t, 1);
+      say(st, st.p[t].name + ' 发动【斗志】，摸 1 张牌。', t);
+    }
+    if(has(st.p[t],'danlie') && !st.p[t].used.danlie && st.p[t].hp === 1){
+      st.p[t].used.danlie = true;
+      draw(st, t, 3);
+      say(st, st.p[t].name + ' 胆大如斗！【胆烈】发动：摸 3 张牌。', t);
+    }
+    if(st.p[t].hp <= 0){
+      st.p[t].hp = 0;
+      st.p[t].dying = true;
+      st.events.push({ type:'dying', p:t });
+      say(st, '⚠️ ' + st.p[t].name + ' 濒死！只有一张【桃】能救回性命。', t);
+      st.awaiting = { p:t, type:'dying' };
+    }
+  }
+
+  /* 濒死结算：先问濒死者自己，没桃再问对手是否出手相救 */
+  function resolveDying(st, use){
+    var a = st.awaiting, t = a.p, o = 1 - t;
+    var pi = st.p[t].hand.indexOf('peach');
+    if(use && pi >= 0){
+      discardCard(st, t, pi);
+      st.p[t].hp = 1;
+      st.p[t].dying = false;
+      st.events.push({ type:'heal', p:t });
+      say(st, st.p[t].name + ' 用【桃】续命，体力回到 1 点，绝处逢生！', t);
+      st.awaiting = null;
+      afterAction(st);
+      return;
+    }
+    if(st.p[o].hand.indexOf('peach') >= 0){
+      st.awaiting = { p:o, type:'save', dying:t };
+      return;
+    }
+    st.p[t].dying = false;
+    finish(st, o);
+  }
+
+  function resolveSave(st, use){
+    var a = st.awaiting, o = a.p, t = a.dying;
+    var pi = st.p[o].hand.indexOf('peach');
+    if(use && pi >= 0){
+      discardCard(st, o, pi);
+      st.p[t].hp = 1;
+      st.p[t].dying = false;
+      st.events.push({ type:'heal', p:t });
+      say(st, '🤝 ' + st.p[o].name + ' 念在对手之情，出【桃】救了 ' + st.p[t].name + ' 一命！', o);
+      st.awaiting = null;
+      afterAction(st);
+      return;
+    }
+    st.p[t].dying = false;
+    st.awaiting = null;
+    finish(st, o);
+  }
+
+  function doPeach(st){
+    var p = st.turn, i = st.p[p].hand.indexOf('peach');
+    if(i < 0 || st.p[p].hp >= st.p[p].maxHp || st.p[p].used.peach) return;
+    discardCard(st, p, i);
+    st.p[p].used.peach = true;
+    st.p[p].hp = Math.min(st.p[p].maxHp, st.p[p].hp + 1);
+    st.events.push({ type:'heal', p:p });
+    say(st, st.p[p].name + ' 使用【桃】，回复 1 点体力。', p);
+  }
+
+  function doWzsy(st){
+    var p = st.turn, i = st.p[p].hand.indexOf('wzsy');
+    if(i < 0) return;
+    discardCard(st, p, i);
+    draw(st, p, 2);
+    st.events.push({ type:'draw', p:p });
+    say(st, st.p[p].name + ' 使用【无中生有】，摸 2 张牌。', p);
+  }
+
+  function doRuiqi(st, idx){
+    var p = st.turn;
+    if(st.p[p].used.ruiqi || idx == null || idx >= st.p[p].hand.length) return;
+    var c = discardCard(st, p, idx);
+    st.p[p].used.ruiqi = true;
+    draw(st, p, 2);
+    st.events.push({ type:'skill', p:p });
+    say(st, st.p[p].name + ' 发动【锐气】，弃置【' + CARDS[c] + '】，摸 2 张牌。', p);
+  }
+
+  function doLijian(st, idx){
+    var p = st.turn, t = 1-p, k, j;
+    if(st.p[p].used.lijian || !st.p[p].hand.length || !st.p[t].hand.length) return;
+    if(idx == null || idx < 0 || idx >= st.p[p].hand.length) idx = autoDropIdx(st.p[p].hand);
+    var c = discardCard(st, p, idx);
+    st.p[p].used.lijian = true;
+    st.events.push({ type:'skill', p:p });
+    say(st, st.p[p].name + ' 发动【离间】，弃置【' + CARDS[c] + '】，令对方弃置两张手牌！', p);
+    for(k=0;k<2 && st.p[t].hand.length;k++){
+      j = autoDropIdx(st.p[t].hand);
+      var dc = discardCard(st, t, j);
+      say(st, st.p[t].name + ' 被离间，弃置了【' + CARDS[dc] + '】。', t);
+    }
+  }
+
+  function directDamage(st, t, n, from){
+    dealDamage(st, t, n, from);
+  }
+
+  function autoDropIdx(h, prefer){
+    /* 找最不值得留的牌：优先闪，其次无中，最后第一张 */
+    var order = prefer || ['dodge','wzsy','slash','peach'];
+    for(var i=0;i<order.length;i++){
+      var idx = h.indexOf(order[i]);
+      if(idx >= 0) return idx;
+    }
+    return 0;
+  }
+
+  function doQimou(st, idx){
+    var p = st.turn;
+    if(st.p[p].used.qimou || !st.p[p].hand.length) return;
+    if(idx == null || idx < 0 || idx >= st.p[p].hand.length) idx = autoDropIdx(st.p[p].hand);
+    var c = discardCard(st, p, idx);
+    st.p[p].used.qimou = true;
+    st.events.push({ type:'skill', p:p });
+    say(st, st.p[p].name + ' 发动【奇谋】，弃置【' + CARDS[c] + '】，直取一击（不可闪避）！', p);
+    directDamage(st, 1-p, 1, p);
+    if(!st.over) afterAction(st);
+  }
+
+  function doYehuo(st, idxs){
+    var p = st.turn, h = st.p[p].hand, i;
+    if(st.p[p].used.yehuo || h.length < 2) return;
+    var drop = [];
+    if(idxs && idxs.length >= 2){
+      idxs = idxs.slice(0,2).sort(function(x,y){ return y-x; });
+      for(i=0;i<2;i++) if(idxs[i] >= 0 && idxs[i] < h.length) drop.push(discardCard(st, p, idxs[i]));
+    } else {
+      var tmp = h.slice();
+      for(i=0;i<2;i++){
+        var k = autoDropIdx(tmp);
+        drop.push(discardCard(st, p, k));
+        tmp.splice(k,1);
+      }
+    }
+    if(drop.length < 2) return;
+    st.p[p].used.yehuo = true;
+    st.events.push({ type:'skill', p:p });
+    say(st, st.p[p].name + ' 发动【业火】，弃置【' + CARDS[drop[0]] + '】【' + CARDS[drop[1]] +
+      '】，火烧连营（2 点伤害，不可闪避）！', p);
+    directDamage(st, 1-p, 2, p);
+    if(!st.over) afterAction(st);
+  }
+
+  function afterAction(st){
+    if(st.over) return;
+    if(st.awaiting) return;
+    st.phase = 'play';
+  }
+
+  function endTurn(st){
+    if(!canAct(st)) return;
+    var p = st.turn, need = st.p[p].hand.length - maxHand(st, p);
+    if(need > 0){ st.awaiting = { p:p, type:'discard', n:need }; return; }
+    nextPlayer(st);
+  }
+
+  function doDiscard(st, idxs){
+    var a = st.awaiting, p = a.p;
+    idxs = (idxs||[]).slice().sort(function(x,y){ return y-x; });
+    for(var i=0;i<idxs.length;i++){
+      if(idxs[i] >= 0 && idxs[i] < st.p[p].hand.length) discardCard(st, p, idxs[i]);
+    }
+    st.awaiting = null;
+    nextPlayer(st);
+  }
+
+  function nextPlayer(st){
+    st.turn = 1 - st.turn;
+    if(st.turn === 0) st.round++;
+    if(st.round > 60){ st.over = true; st.winner = -1; st.overReason = '超过 60 轮，本局判和。'; return; }
+    beginTurn(st);
+  }
+
+  function finish(st, w){
+    st.over = true; st.winner = w;
+    st.events.push({ type:'over', w:w });
+    st.overReason = (w < 0 ? '平局' : st.p[w].name + ' 获胜！');
+    say(st, '==== ' + st.overReason + ' ====');
+  }
+
+  /* --- AI --- */
+  function aiStep(st){
+    if(st.over) return null;
+    var p = active(st);
+    if(st.awaiting){
+      var a = st.awaiting, h = st.p[p].hand;
+      if(a.type==='yusuan') return { t:'yusuan', use:true };
+      if(a.type==='keep'){
+        var keep = [];
+        var order = ['peach','slash','wzsy','dodge'];
+        for(var k=0;k<order.length && keep.length<a.n;k++){
+          var i = h.indexOf(order[k]);
+          if(i>=0) keep.push(i);
+        }
+        for(var j=0;j<h.length && keep.length<a.n;j++) if(keep.indexOf(j)<0) keep.push(j);
+        return { t:'keep', idxs:keep };
+      }
+      if(a.type==='dying') return { t:'dying', use: h.indexOf('peach') >= 0 };
+      if(a.type==='save') return { t:'save', use:false };
+      if(a.type==='jinglan') return { t:'jinglan', use: a.dmg >= 2 || st.p[p].hp <= 1 };
+      if(a.type==='dodge'){
+        var hasDodge = h.indexOf('dodge') >= 0 || (has(st.p[p],'longdan') && h.indexOf('slash') >= 0);
+        var use = hasDodge && (st.p[p].hp <= a.dmg || st.p[p].hp <= 2);
+        return { t:'dodge', use:use };
+      }
+      if(a.type==='jinghong') return { t:'jinghong', use:true };
+      if(a.type==='discard'){
+        var drop = [], prio = { dodge:0, wzsy:2, slash:3, peach:5 };
+        var arr = [];
+        for(var m=0;m<h.length;m++) arr.push({ i:m, v:prio[h[m]] });
+        arr.sort(function(x,y){ return x.v - y.v; });
+        for(var q=0;q<a.n && q<arr.length;q++) drop.push(arr[q].i);
+        return { t:'discard', idxs:drop };
+      }
+    }
+    var L = legal(st), hh = st.p[p].hand;
+    if(L.peach && st.p[p].hp <= 1) return { t:'peach' };
+    if(L.yehuo && hh.length >= 3) return { t:'yehuo' };
+    if(L.lijian && hh.length >= 3) return { t:'lijian' };
+    if(L.slash) return { t:'slash' };
+    if(L.qimou && hh.length >= 2) return { t:'qimou' };
+    if(L.wzsy && hh.length <= 3) return { t:'wzsy' };
+    if(L.peach) return { t:'peach' };
+    if(L.ruiqi && (hh.length >= 2 || hh.indexOf('slash') < 0)){
+      var di = hh.indexOf('dodge');
+      return { t:'ruiqi', idx: di >= 0 ? di : 0 };
+    }
+    if(L.qimou) return { t:'qimou' };
+    if(L.yehuo) return { t:'yehuo' };
+    if(L.lijian) return { t:'lijian' };
+    if(L.wzsy) return { t:'wzsy' };
+    return { t:'end' };
+  }
+
+  function apply(st, mv){
+    if(!mv || st.over) return;
+    switch(mv.t){
+      case 'yusuan': doYusuan(st, mv.use); break;
+      case 'keep': /* 羽算保留 */ finishKeep(st, mv.idxs); break;
+      case 'jinglan': resolveJinglan(st, mv.use); break;
+      case 'dodge': resolveDodge(st, mv.use); break;
+      case 'jinghong': doJinghong(st, mv.use); break;
+      case 'dying': resolveDying(st, mv.use); break;
+      case 'save': resolveSave(st, mv.use); break;
+      case 'discard': doDiscard(st, mv.idxs); break;
+      case 'slash': doSlash(st); break;
+      case 'peach': doPeach(st); break;
+      case 'wzsy': doWzsy(st); break;
+      case 'ruiqi': doRuiqi(st, mv.idx); break;
+      case 'qimou': doQimou(st, mv.idx); break;
+      case 'lijian': doLijian(st, mv.idx); break;
+      case 'yehuo': doYehuo(st, mv.idxs); break;
+      case 'end': endTurn(st); break;
+    }
+  }
+
+  function finishKeep(st, idxs){
+    var a = st.awaiting, p = a.p, h = st.p[p].hand, i;
+    idxs = (idxs || []).filter(function(x){ return x >= 0 && x < h.length; }).slice(0, a.n);
+    var mark = {}, keep = [], drop = [];
+    for(i=0;i<idxs.length;i++) mark[idxs[i]] = 1;
+    for(i=0;i<h.length;i++){ if(mark[i]) keep.push(h[i]); else drop.push(h[i]); }
+    st.discard = st.discard.concat(drop);
+    st.p[p].hand = keep;
+    say(st, st.p[p].name + ' 保留了 ' + keep.length + ' 张牌。', p);
+    st.awaiting = null;
+    st.phase = 'play';
+  }
+
+  return {
+    CARDS:CARDS, HEROES:HEROES, newGame:newGame, legal:legal, apply:apply, aiStep:aiStep,
+    active:active, maxHand:maxHand, canAct:canAct, has:has
+  };
+})();
+if (typeof module !== 'undefined') module.exports = SG;
+</script>
+
+<script>
+/* ========== 界面层 ========== */
+var ART = { boy:'art/hero.png', baiyu:'art/strategist.png', qingluan:'art/archer.png',
+            gushan:'art/general.png', jiangwei:'art/jiangwei.png',
+            weiyan:'art/weiyan.png', zhouyu:'art/zhouyu.png', dengai:'art/dengai.png',
+            lvbu:'art/lvbu.png', zhaoyun:'art/zhaoyun.png',
+            zhugeliang:'art/zhugeliang.png', diaochan:'art/diaochan.png',
+            guanyu:'art/guanyu.png', zhangfei:'art/zhangfei.png', machao:'art/machao.png' };
+var FCN = { wei:'魏', shu:'蜀', wu:'吴', qun:'群', shen:'神', shi:'势' };
+/* 花色 = 势力（魏♠ 蜀♥ 吴♣ 群♦ 神★ 势◆） */
+var SUIT = { wei:{ s:'♠', c:'black' }, shu:{ s:'♥', c:'red' }, wu:{ s:'♣', c:'black' },
+             qun:{ s:'♦', c:'red' },   shen:{ s:'★', c:'shen' }, shi:{ s:'◆', c:'shi' } };
+function corner(h){
+  var t = SUIT[h.faction] || SUIT.qun;
+  return '<span class="corner tl ' + t.c + '"><span class="suit">' + t.s + '</span><span class="num">' + h.power + '</span></span>' +
+         '<span class="corner br ' + t.c + '"><span class="suit">' + t.s + '</span><span class="num">' + h.power + '</span></span>';
+}
+var FC = { wei:'#2E5C8A', shu:'#3B7A3B', wu:'#B03A2E', qun:'#9A7B0A', shen:'#6D4C9F', shi:'#C86A27' };
+var CN = { slash:'杀', dodge:'闪', peach:'桃', wzsy:'无中生有' };
+var DESC = { slash:'攻击对手，对方不出闪则掉血', dodge:'抵消一次杀', peach:'回复 1 点体力', wzsy:'立即摸 2 张牌' };
+
+var myHero = 'boy', mode = 'ai', G = null, sel = [], muted = false, busy = false;
+
+var HINT = {
+  boy:'每回合可出 2 次杀，还能弃 1 摸 2（新手首选）',
+  baiyu:'摸 3 留 2 挑好牌，每回合免疫 1 次杀',
+  qingluan:'用闪就反手打 1 点伤害，杀中后摸牌',
+  gushan:'每回合第一张杀伤害 +1，受伤就摸牌',
+  jiangwei:'每回合最多 3 次杀，残血爆发（最强）',
+  weiyan:'弃 1 张牌就打 1 点必中伤害，首杀伤害 +1',
+  zhouyu:'弃 2 张牌火烧 2 点必中伤害，每回合多摸 1 张',
+  dengai:'杀中一次就多一次出杀机会，滚雪球越打越猛',
+  lvbu:'对方要出两张闪才挡得住，首杀还加伤',
+  zhaoyun:'杀可以当闪、闪可以当杀，攻守一体',
+  zhugeliang:'手里没牌时，敌人根本砍不到你',
+  diaochan:'弃 1 张牌，逼对方连丢 2 张',
+  guanyu:'每回合一刀 2 点必中，稳稳砍中',
+  zhangfei:'每回合 2 次杀，砍中还逼对方弃牌',
+  machao:'每一刀都是 2 点伤害，还多摸牌'
+};
+
+function renderPicks(){
+  document.getElementById('picks').innerHTML = SG.HEROES.map(function(h){
+    return '<div class="pick' + (h.id===myHero?' on':'') + '" onclick="pick(\'' + h.id + '\')">' +
+      corner(h) +
+      '<img src="' + ART[h.id] + '" alt="">' +
+      '<div class="pn" style="color:' + FC[h.faction] + '">' + h.name + '</div>' +
+      '<div class="pf">' + FCN[h.faction] + ' · ' + h.hp + ' 体力 · 战力 ' + h.power + '</div>' +
+      '<div class="ps">' + h.skills.map(function(s){ return '【' + s.name + '】'; }).join(' ') +
+        '<br><span style="color:#6b665c">' + h.skills.map(function(s){ return s.desc; }).join(' ') + '</span>' +
+        '<br><span style="color:#8a857a">' + HINT[h.id] + '</span></div>' +
+    '</div>';
+  }).join('');
+}
+function pick(id){ myHero = id; SFX.click(); renderPicks(); }
+function setMode(m){ mode = m; document.getElementById('btnAi').className = (m==='ai'?'pri':'');
+  document.getElementById('btnPvp').className = (m==='pvp'?'pri':''); }
+function startGame(){
+  var foe = SG.HEROES.filter(function(h){ return h.id !== myHero; });
+  var foeId = foe[Math.floor(Math.random()*foe.length)].id;
+  G = SG.newGame({ seed:(Math.random()*1e9)|0, p0:myHero, p1:foeId });
+  sel = [];
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('board').style.display = 'block';
+  SFX.start();
+  render();
+  if(mode==='ai') tick();
+}
+function backSetup(){
+  document.getElementById('setup').style.display = 'block';
+  document.getElementById('board').style.display = 'none';
+  G = null;
+}
+
+function face(pid){
+  var pl = G.p[pid];
+  var pips = '';
+  for(var i=0;i<pl.maxHp;i++) pips += '<span class="pip' + (i<pl.hp?'':' off') + '"></span>';
+  var st = SUIT[pl.hero.faction] || SUIT.qun;
+  var stc = st.c==='red' ? '#B03A2E' : (st.c==='black' ? '#3B332A' : (st.c==='shen' ? '#6D4C9F' : '#C86A27'));
+  return '<img class="face" src="' + ART[pl.hero.id] + '" alt="">' +
+    '<div class="info"><div class="iname" style="color:' + FC[pl.hero.faction] + '">' + pl.name +
+    (pid===0?'（你）':'（' + (mode==='ai'?'电脑':'对手') + '）') +
+    (pl.dying ? '<span style="color:#B03A2E;font-size:12px;"> ⚠️ 濒死求桃</span>' : '') + '</div>' +
+    '<div class="imeta">' + FCN[pl.hero.faction] + ' · <b style="color:' + stc + '">' +
+      st.s + ' 战力 ' + pl.hero.power + '</b> · ' + pl.hero.skills.map(function(s){return '【'+s.name+'】';}).join('') + '</div>' +
+    '<div class="hp">' + pips + '<span class="hnum">' + Math.max(0,pl.hp) + '/' + pl.maxHp + '</span></div>' +
+    '<div class="iskill">' + pl.hero.skills.map(function(s){
+        return '<b>【' + s.name + '】</b>' + (s.kind==='locked'?'<span class="locked-tag">锁定</span> ':'') + s.desc;
+      }).join('<br>') + '</div>' +
+    '</div>' +
+    '<div class="handcnt">手牌 ' + pl.hand.length + '</div>' +
+    '<div class="float" id="fl' + pid + '"></div>';
+}
+
+function render(){
+  if(!G) return;
+  G.events.forEach(function(ev){
+    if(ev.type === 'damage'){
+      var el = document.getElementById('fl' + ev.p);
+      if(el){ el.textContent = '-' + ev.n; el.classList.remove('go'); void el.offsetWidth; el.classList.add('go'); }
+      if(ev.n >= 2) SFX.big(); else SFX.hit();
+    }
+    else if(ev.type === 'slash') SFX.slash();
+    else if(ev.type === 'dodge') SFX.dodge();
+    else if(ev.type === 'heal') SFX.heal();
+    else if(ev.type === 'draw') SFX.draw();
+    else if(ev.type === 'skill') SFX.skill();
+    else if(ev.type === 'dying') SFX.dying();
+    else if(ev.type === 'over'){ if(ev.w === 0) SFX.win(); else SFX.lose(); }
+  });
+  G.events = [];
+
+  document.getElementById('sideTop').className = 'side' + (SG.active(G)===1?' act':'');
+  document.getElementById('sideTop').innerHTML = face(1);
+  document.getElementById('sideBot').className = 'side' + (SG.active(G)===0?' act':'');
+  document.getElementById('sideBot').innerHTML = face(0);
+
+  var lg = document.getElementById('log');
+  lg.innerHTML = G.log.slice(-40).map(function(l){
+    var cls = l.who===0?'me':(l.who===1?'op':'');
+    return '<div class="' + cls + '">' + l.t + '</div>';
+  }).join('');
+  lg.scrollTop = lg.scrollHeight;
+
+  renderHand();
+  renderActs();
+
+  if(G.over){
+    document.getElementById('ovTitle').textContent = G.winner===0?'胜利！':(G.winner<0?'平局':'再接再厉');
+    document.getElementById('ovText').textContent = G.overReason;
+    document.getElementById('ov').className = 'ov on';
+  }
+}
+
+function viewIdx(){ return mode === 'ai' ? 0 : SG.active(G); }
+
+function renderHand(){
+  var box = document.getElementById('hand');
+  var vi = viewIdx();
+  document.getElementById('handLabel').textContent = '手牌（' + G.p[vi].name + '，点牌可使用 / 选中）';
+  if(!G.p[vi] || !G.p[vi].hand.length){ box.innerHTML = '<span style="color:#a9a396;font-size:13px;">（没有手牌）</span>'; return; }
+  var clickable = (SG.active(G) === vi);
+  box.innerHTML = G.p[vi].hand.map(function(c,i){
+    return '<div class="card ' + c + (sel.indexOf(i)>=0?' sel':'') + '"' +
+      (clickable?' onclick="tapCard(' + i + ')"':'') + '>' + CN[c] + '<small>' + DESC[c] + '</small></div>';
+  }).join('');
+}
+
+function tapCard(i){
+  if(SG.active(G) !== viewIdx() || busy) return;
+  var a = G.awaiting, vi = viewIdx();
+  var c = G.p[vi].hand[i];
+  SFX.click();
+  if(a && a.type==='keep'){
+    if(sel.indexOf(i)>=0) sel = sel.filter(function(x){return x!==i;});
+    else if(sel.length < a.n) sel.push(i);
+    render(); return;
+  }
+  if(a && a.type==='discard'){
+    if(sel.indexOf(i)>=0) sel = sel.filter(function(x){return x!==i;});
+    else if(sel.length < a.n) sel.push(i);
+    render(); return;
+  }
+  if(a && a.type==='dodge'){
+    if(c==='dodge'){ SG.apply(G, { t:'dodge', use:true }); sel=[]; after(); }
+    else flash('只能出【闪】来响应，或者选择“硬吃这一下”。');
+    return;
+  }
+  if(a && a.type==='dying'){
+    if(c==='peach'){ SG.apply(G, { t:'dying', use:true }); sel=[]; after(); }
+    else flash('濒死时只有【桃】能救命，也可以点上面的按钮。');
+    return;
+  }
+  if(a && a.type==='save'){
+    if(c==='peach'){ SG.apply(G, { t:'save', use:true }); sel=[]; after(); }
+    else flash('只有【桃】能救人，也可以点上面的按钮。');
+    return;
+  }
+  if(a && (a.type==='jinglan' || a.type==='jinghong')) return;
+  if(a && a.type==='yusuan') return;
+  var L = SG.legal(G);
+  if((c==='slash' || (c==='dodge' && SG.has(G.p[vi],'longdan'))) && L.slash){ SG.apply(G,{t:'slash'}); after(); return; }
+  if(c==='peach'){ if(L.peach){ SG.apply(G,{t:'peach'}); after(); } else flash('体力已满，吃桃浪费了。'); return; }
+  if(c==='wzsy'){ if(L.wzsy){ SG.apply(G,{t:'wzsy'}); after(); } return; }
+}
+
+function flash(msg){
+  var t = document.getElementById('tip');
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(flash._t);
+  flash._t = setTimeout(function(){ t.style.display='none'; }, 2200);
+}
+
+function renderActs(){
+  var box = document.getElementById('acts');
+  var tip = document.getElementById('tip');
+  tip.style.display = 'none';
+  if(!G || G.over){ box.innerHTML = ''; return; }
+  var a = G.awaiting;
+  if(a && a.p === 1 && mode === 'ai'){ box.innerHTML = '<span style="font-size:13px;color:#8a857a;">电脑思考中…</span>'; return; }
+
+  if(a && a.type==='yusuan'){
+    box.innerHTML = '<button class="pri" onclick="act({t:\'yusuan\',use:true})">发动【羽算】：摸 3 张留 2 张</button>' +
+                    '<button onclick="act({t:\'yusuan\',use:false})">正常摸 2 张</button>';
+    return;
+  }
+  if(a && a.type==='keep'){
+    box.innerHTML = '<span style="font-size:13px;">【羽算】请选 ' + a.n + ' 张保留：</span>' +
+      '<button class="pri"' + (sel.length===a.n?'':' disabled') + ' onclick="act({t:\'keep\',idxs:sel})">确定</button>';
+    tip.textContent = '点手牌选中要留下的 ' + a.n + ' 张，再点确定。'; tip.style.display='block';
+    return;
+  }
+  if(a && a.type==='jinglan'){
+    var c = G.p[a.p].hand[a.cardIdx];
+    box.innerHTML = '<span style="font-size:13px;">被【杀】了！可以发动【静澜】弃掉【' + CN[c] + '】让这次杀无效。</span>' +
+      '<button class="pri" onclick="act({t:\'jinglan\',use:true})">发动静澜</button>' +
+      '<button onclick="act({t:\'jinglan\',use:false})">不发动</button>';
+    return;
+  }
+  if(a && a.type==='dying'){
+    var hasP = G.p[a.p].hand.indexOf('peach') >= 0;
+    box.innerHTML = '<span style="font-size:13px;color:#B03A2E;font-weight:700;">⚠️ ' + G.p[a.p].name +
+      ' 濒死！需要一张【桃】才能活命。</span>' +
+      '<button class="pri"' + (hasP?'':' disabled') + ' onclick="act({t:\'dying\',use:true})">用【桃】续命</button>' +
+      '<button onclick="act({t:\'dying\',use:false})">' + (hasP ? '不用桃，听天由命' : '没有桃，就此倒下') + '</button>';
+    return;
+  }
+  if(a && a.type==='save'){
+    var hasP2 = G.p[a.p].hand.indexOf('peach') >= 0;
+    box.innerHTML = '<span style="font-size:13px;">' + G.p[a.dying].name +
+      ' 濒死求救！你可以出一张【桃】救他一命（也可以不救，直接获胜）。</span>' +
+      '<button class="pri"' + (hasP2?'':' disabled') + ' onclick="act({t:\'save\',use:true})">🤝 出【桃】相救</button>' +
+      '<button onclick="act({t:\'save\',use:false})">不救，取其性命</button>';
+    return;
+  }
+  if(a && a.type==='dodge'){
+    box.innerHTML = '<span style="font-size:13px;">被【杀】了，伤害 ' + a.dmg + ' 点。' +
+      (a.noDodge ? '<b style="color:#B03A2E;">【武圣】此杀无法闪避！</b>' : '') +
+      (a.need > 1 ? '<b style="color:#B03A2E;">【无双】需要出两张闪！</b>' : '') + '</span>' +
+      (a.canDodge ? '<button class="pri" onclick="act({t:\'dodge\',use:true})">出【闪】</button>' +
+        '<button onclick="act({t:\'dodge\',use:false})">硬吃这一下</button>'
+      : '<button class="pri" onclick="act({t:\'dodge\',use:false})">' + (a.noDodge ? '硬吃 ' : '没有闪，硬吃 ') + a.dmg + ' 点</button>');
+    return;
+  }
+  if(a && a.type==='jinghong'){
+    box.innerHTML = '<span style="font-size:13px;">【惊鸿】：可以反手一箭，对对方造成 1 点伤害。</span>' +
+      '<button class="pri" onclick="act({t:\'jinghong\',use:true})">发动惊鸿</button>' +
+      '<button onclick="act({t:\'jinghong\',use:false})">算了</button>';
+    return;
+  }
+  if(a && a.type==='discard'){
+    box.innerHTML = '<span style="font-size:13px;">弃牌阶段：手牌上限 ' + SG.maxHand(G,a.p) + '，需弃 ' + a.n + ' 张。</span>' +
+      '<button class="pri"' + (sel.length===a.n?'':' disabled') + ' onclick="act({t:\'discard\',idxs:sel})">确定弃掉</button>';
+    tip.textContent = '点手牌选中要弃的 ' + a.n + ' 张，再点确定。'; tip.style.display='block';
+    return;
+  }
+
+  var L = SG.legal(G);
+  var mine = SG.active(G)===0 || mode==='pvp';
+  if(!mine){ box.innerHTML = '<span style="font-size:13px;color:#8a857a;">对手回合，请把手机/电脑交给对手。</span>'; return; }
+  box.innerHTML =
+    '<button' + (L.slash?' class="pri"':' disabled') + ' onclick="act({t:\'slash\'})">出【杀】</button>' +
+    '<button' + (L.peach?'':' disabled') + ' onclick="act({t:\'peach\'})">吃【桃】</button>' +
+    '<button' + (L.wzsy?'':' disabled') + ' onclick="act({t:\'wzsy\'})">无中生有</button>' +
+    (L.qimou ? '<button onclick="act({t:\'qimou\'})">【奇谋】弃1张→1点必中伤害</button>' : '') +
+    (L.yehuo ? '<button onclick="act({t:\'yehuo\'})">【业火】弃2张→2点必中伤害</button>' : '') +
+    (L.ruiqi ? '<button onclick="ruiqi()">【锐气】弃1摸2</button>' : '') +
+    (L.lijian ? '<button onclick="act({t:\'lijian\'})">【离间】弃1张→逼对方弃2张</button>' : '') +
+    '<button onclick="act({t:\'end\'})">结束回合</button>';
+}
+
+function ruiqi(){
+  var vi = viewIdx(), h = G.p[vi].hand;
+  if(!h.length) return;
+  var d = h.indexOf('dodge');
+  act({ t:'ruiqi', idx: d >= 0 ? d : 0 });
+}
+
+function act(mv){
+  if(busy) return;
+  SG.apply(G, mv);
+  sel = [];
+  after();
+}
+
+function after(){
+  render();
+  if(!G.over && mode==='ai' && SG.active(G)===1) tick();
+  else if(!G.over && mode==='pvp') render();
+}
+
+function tick(){
+  busy = true;
+  var step = function(){
+    if(!G || G.over || SG.active(G)!==1){ busy = false; render(); return; }
+    var mv = SG.aiStep(G);
+    if(!mv){ busy = false; render(); return; }
+    SG.apply(G, mv);
+    render();
+    setTimeout(step, 520);
+  };
+  setTimeout(step, 520);
+  busy = false;
+}
+
+function again(){
+  document.getElementById('ov').className = 'ov';
+  startGame();
+}
+
+/* ===== 音效：全部用 Web Audio 现场合成，不加载任何音频文件 ===== */
+var AC = null, MASTER = null, bgmOn = false, bgmTimer = null;
+function ac(){
+  try{
+    if(!AC){
+      var Ctor = window.AudioContext || window.webkitAudioContext;
+      if(!Ctor) return null;
+      AC = new Ctor();
+      MASTER = AC.createGain(); MASTER.gain.value = 0.55; MASTER.connect(AC.destination);
+    }
+    return AC;
+  }catch(e){ return null; }
+}
+function tone(o){
+  var c = ac(); if(!c || muted) return;
+  try{
+    var dur = o.dur || 0.15, t0 = c.currentTime + (o.delay || 0);
+    var osc = c.createOscillator(), g = c.createGain();
+    osc.type = o.type || 'sine';
+    osc.frequency.setValueAtTime(o.f, t0);
+    if(o.to) osc.frequency.exponentialRampToValueAtTime(Math.max(30,o.to), t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(o.vol || 0.12, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g); g.connect(MASTER);
+    osc.start(t0); osc.stop(t0 + dur + 0.03);
+  }catch(e){}
+}
+function noise(o){
+  var c = ac(); if(!c || muted) return;
+  try{
+    var dur = o.dur || 0.12, t0 = c.currentTime + (o.delay || 0);
+    var n = Math.max(1, Math.floor(c.sampleRate * dur));
+    var buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0), i;
+    for(i=0;i<n;i++) d[i] = (Math.random()*2-1) * (1 - i/n);
+    var src = c.createBufferSource(); src.buffer = buf;
+    var f = c.createBiquadFilter(); f.type = 'bandpass';
+    f.frequency.value = o.freq || 1200; f.Q.value = o.q || 1.1;
+    var g = c.createGain(); g.gain.value = o.vol || 0.16;
+    src.connect(f); f.connect(g); g.connect(MASTER);
+    src.start(t0);
+  }catch(e){}
+}
+var SFX = {
+  click: function(){ tone({ f:780, to:520, type:'triangle', dur:0.07, vol:0.09 }); },
+  draw:  function(){ noise({ freq:2800, dur:0.05, vol:0.06 }); tone({ f:1180, type:'sine', dur:0.05, vol:0.05 }); },
+  slash: function(){ tone({ f:760, to:180, type:'sawtooth', dur:0.20, vol:0.15 }); noise({ freq:1000, dur:0.13, vol:0.13 }); },
+  dodge: function(){ tone({ f:540, to:1000, type:'sine', dur:0.13, vol:0.11 }); noise({ freq:3200, dur:0.07, vol:0.07 }); },
+  hit:   function(){ tone({ f:200, to:62, type:'square', dur:0.26, vol:0.19 }); noise({ freq:340, dur:0.20, vol:0.15 }); },
+  big:   function(){ tone({ f:150, to:45, type:'sawtooth', dur:0.44, vol:0.22 });
+                     noise({ freq:240, dur:0.34, vol:0.18 });
+                     tone({ f:700, to:200, type:'square', dur:0.30, vol:0.10, delay:0.05 }); },
+  heal:  function(){ tone({ f:523, type:'triangle', dur:0.16, vol:0.11 });
+                     tone({ f:784, type:'sine', dur:0.22, vol:0.09, delay:0.08 }); },
+  skill: function(){ [392,523,659].forEach(function(f,i){ tone({ f:f, type:'triangle', dur:0.14, vol:0.11, delay:i*0.085 }); }); },
+  dying: function(){ tone({ f:120, to:70, type:'sawtooth', dur:0.7, vol:0.16 });
+                     tone({ f:180, to:110, type:'square', dur:0.55, vol:0.10, delay:0.10 });
+                     noise({ freq:180, dur:0.5, vol:0.10 }); },
+  start: function(){ tone({ f:294, type:'triangle', dur:0.20, vol:0.11 }); tone({ f:440, type:'triangle', dur:0.26, vol:0.11, delay:0.14 }); },
+  win:   function(){ [523,587,659,784,880].forEach(function(f,i){ tone({ f:f, type:'triangle', dur:0.30, vol:0.12, delay:i*0.12 }); }); },
+  lose:  function(){ [440,392,330,262].forEach(function(f,i){ tone({ f:f, type:'sine', dur:0.34, vol:0.12, delay:i*0.16 }); }); }
+};
+var PENTA = [262,294,330,392,440,523,587,659];
+function bgmStep(){
+  if(!bgmOn || muted) return;
+  tone({ f:PENTA[(Math.random()*PENTA.length)|0], type:'triangle', dur:0.55, vol:0.045 });
+  if(Math.random() < 0.55) noise({ freq:170, dur:0.17, vol:0.055, q:0.8 });
+}
+function toggleMute(){ muted = !muted; document.getElementById('muteTxt').textContent = muted ? '关' : '开'; }
+function toggleBgm(){
+  bgmOn = !bgmOn;
+  document.getElementById('bgmTxt').textContent = bgmOn ? '开' : '关';
+  if(bgmOn){ ac(); bgmStep(); bgmTimer = setInterval(bgmStep, 900); }
+  else if(bgmTimer){ clearInterval(bgmTimer); bgmTimer = null; }
+}
+
+renderPicks();
+setMode('ai');
+</script>
+</body>
+</html>
