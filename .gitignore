@@ -1,0 +1,13 @@
+# 临时/调试产物（验证脚本、截图、探针页）
+.tmp_*
+.tmp/
+tests/_*.tmp.js
+*.log
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 依赖
+node_modules/
