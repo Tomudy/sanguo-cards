@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>三国武将卡 · 亲子打印版</title>
+<style>
+  :root{
+    --wei:#2E5C8A; --shu:#3B7A3B; --wu:#B03A2E; --qun:#9A7B0A;
+    --shen:#6D4C9F; --shi:#C86A27;
+    --paper:#FBF6EA; --ink:#3B332A;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:#ECEAE4;font-family:"Microsoft YaHei","PingFang SC",sans-serif;color:var(--ink);}
+  .toolbar{max-width:900px;margin:16px auto 8px;padding:14px 18px;background:#fff;border-radius:12px;
+    border:0.5px solid #d8d5cc;font-size:13px;line-height:1.8;}
+  .toolbar h1{font-size:16px;margin-bottom:6px;}
+  .toolbar button{margin-top:8px;padding:8px 20px;border:1px solid #bbb;border-radius:8px;background:#31597E;
+    color:#fff;font-size:14px;cursor:pointer;}
+  .toolbar button:hover{background:#274a6b;}
+  .toolbar .hint{color:#8a857a;}
+  .sheet{width:210mm;min-height:293mm;margin:12px auto;background:#fff;padding:8mm;
+    display:grid;grid-template-columns:repeat(3,63mm);grid-auto-rows:88mm;gap:3mm;justify-content:center;}
+  .card{width:63mm;height:88mm;background:var(--paper);border:1px dashed #b9b3a4;border-radius:3mm;
+    padding:2.2mm;display:flex;flex-direction:column;overflow:hidden;page-break-inside:avoid;position:relative;}
+  /* 花色 + 战力点数角标 */
+  .pcorner{position:absolute;line-height:1.05;text-align:center;font-weight:700;
+    background:rgba(255,255,255,.86);border-radius:1.2mm;padding:.3mm 1mm;}
+  .pcorner .s{font-size:10pt;display:block;}
+  .pcorner .n{font-size:9pt;display:block;font-family:"KaiTi","STKaiti","SimSun",serif;}
+  .pcorner.tl{left:3.4mm;top:12mm;}
+  .pcorner.br{right:3.4mm;bottom:3mm;transform:rotate(180deg);}
+  .card.wei{--fc:var(--wei);} .card.shu{--fc:var(--shu);} .card.wu{--fc:var(--wu);} .card.qun{--fc:var(--qun);}
+  .card.shen{--fc:var(--shen);}
+  .card.shi{--fc:var(--shi);}
+  .card.shen .foot::before{content:"★ ";color:var(--fc);}
+  .card.shi .foot::before{content:"◆ ";color:var(--fc);}
+  .head{height:9mm;display:flex;align-items:center;justify-content:space-between;flex:none;}
+  .name{font-family:"KaiTi","STKaiti","SimSun",serif;font-weight:700;font-size:13.5pt;color:var(--fc);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42mm;}
+  .orbs{display:flex;gap:1.1mm;flex:none;}
+  .orb{width:3.6mm;height:3.6mm;border-radius:50%;background:var(--fc);border:0.4mm solid var(--fc);}
+  .orb.half{background:linear-gradient(90deg,var(--fc) 50%,transparent 50%);}
+  .orb.empty{background:transparent;}
+  .art{flex:none;height:41mm;border:0.5mm solid var(--fc);border-radius:2mm;overflow:hidden;background:#EFE6D2;}
+  .art img{width:100%;height:118%;object-fit:cover;object-position:center 12%;}
+  .panel{flex:1;padding:1.6mm 1mm 0;display:flex;flex-direction:column;gap:1.2mm;font-size:7.2pt;line-height:1.45;}
+  .skill b{color:var(--fc);font-size:7.8pt;}
+  .skill.locked b::after{content:" ·锁定";font-size:5.5pt;color:#9a9384;}
+  .quote{flex:none;text-align:right;font-family:"KaiTi","STKaiti",serif;font-style:italic;
+    color:#8a8172;font-size:7.5pt;padding:0.8mm 1.5mm 0;}
+  .foot{flex:none;font-size:5.5pt;color:#b5ad9b;text-align:center;padding-bottom:0.6mm;}
+  @page{size:A4 portrait;margin:8mm;}
+  /* 屏幕端响应式：A4 纸页约 794px 宽，小屏等比缩小预览（不影响打印，打印走下方 @media print） */
+  @media screen and (max-width:920px){
+    .toolbar{margin:8px 8px 6px;padding:12px 14px;}
+    .sheet{zoom:.92;}
+  }
+  @media screen and (max-width:780px){ .sheet{zoom:.72;} }
+  @media screen and (max-width:580px){ .sheet{zoom:.52;} }
+  @media screen and (max-width:430px){ .sheet{zoom:.4;} }
+  @media screen and (max-width:340px){ .sheet{zoom:.33;} }
+  @media print{
+    body{background:#fff;}
+    .toolbar{display:none;}
+    .sheet{margin:0;width:auto;min-height:auto;padding:0;gap:2.5mm;}
+    .card{border:0.5px solid #b9b3a4;border-radius:2mm;}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <h1>三国武将卡 · 亲子打印版</h1>
+  <p>规格：63mm × 88mm（标准卡牌尺寸），A4 每页 9 张，按虚线裁剪后套磨砂卡套即可上场。</p>
+  <p class="hint">加新卡：在下方 &lt;script&gt; 里的 CARDS 数组照格式加一条，刷新页面即可；把「小将军 ·（写下你的名字）」改成孩子的名字。打印时勾选「背景图形」。</p>
+  <p class="hint"><b>实体卡玩法规则</b>：只有【杀】【闪】【桃】【无中生有】四种牌，每回合摸 2 张 → 出牌 → 弃到体力上限；
+  每回合只能出 1 次杀（小将军、张飞 2 次，神姜维 3 次）、吃 1 张桃。<b style="color:#B03A2E;">体力打到 0 进入濒死</b>：
+  打出 1 张【桃】可自救回 1 点体力，自己没桃时对手可以出桃相救，无人施救才阵亡。</p>
+  <button onclick="window.print()">打印 / 导出 PDF</button>
+</div>
+
+<div class="sheet" id="sheet"></div>
+
+<script>
+const FACTION = { wei:"魏", shu:"蜀", wu:"吴", qun:"群", shen:"神", shi:"势" };
+
+const CARDS = [
+  {
+    name:"小将军 ·（写下你的名字）", power:9, faction:"shu", hp:4, art:"art/hero.png",
+    skills:[
+      { name:"锐气", text:"出牌阶段限一次，你可以弃置一张牌，然后摸两张牌。" },
+      { name:"少年志", locked:true, text:"锁定技，你的手牌上限 +1，且你出牌阶段可使用【杀】的次数 +1。" }
+    ],
+    quote:"且看我一枪定乾坤！"
+  },
+  {
+    name:"白羽先生", power:7, faction:"wei", hp:3, art:"art/strategist.png",
+    skills:[
+      { name:"羽算", text:"摸牌阶段开始时，你可以放弃摸牌，改为摸三张牌，然后保留其中两张。" },
+      { name:"静澜", text:"每回合限一次，当你成为【杀】的目标后，你可以展示一张手牌，若为基本牌，此【杀】对你无效。" }
+    ],
+    quote:"运筹帷幄之中，胜负已分。"
+  },
+  {
+    name:"青鸾", power:6, faction:"wu", hp:3, art:"art/archer.png",
+    skills:[
+      { name:"穿杨", locked:true, text:"当你使用【杀】造成伤害后，你摸一张牌。" },
+      { name:"惊鸿", text:"当你使用【闪】抵消【杀】后，你可以对使用者造成 1 点伤害。" }
+    ],
+    quote:"箭未离弦，心已中靶。"
+  },
+  {
+    name:"虎痴·关山", power:8, faction:"qun", hp:4, art:"art/general.png",
+    skills:[
+      { name:"猛力", text:"出牌阶段，你使用的第一张【杀】伤害 +1。" },
+      { name:"斗志", text:"当你每受到 1 点伤害后，你可以摸一张牌。" }
+    ],
+    quote:"谁敢与我一战！"
+  },
+  {
+    name:"神姜维", power:13, faction:"shen", hp:4, art:"art/jiangwei.png",
+    skills:[
+      { name:"九伐", text:"出牌阶段，你使用【杀】的次数上限为 3。" },
+      { name:"继志", locked:true, text:"锁定技，你的手牌上限 +1。" },
+      { name:"胆烈", text:"每局游戏限一次，当你的体力值变为 1 时，你摸三张牌。" }
+    ],
+    quote:"丞相之志，维不敢忘。"
+  },
+  {
+    name:"吕布", power:9, faction:"qun", hp:4, art:"art/lvbu.png",
+    skills:[
+      { name:"无双", locked:true, text:"锁定技，你使用的【杀】需两张【闪】才能抵消。" },
+      { name:"虓虎", locked:true, text:"锁定技，你每回合使用的第一张【杀】伤害 +1。" }
+    ],
+    quote:"人中吕布，马中赤兔！"
+  },
+  {
+    name:"赵云", power:8, faction:"shu", hp:4, art:"art/zhaoyun.png",
+    skills:[
+      { name:"龙胆", locked:true, text:"锁定技，你可以将【杀】当作【闪】、【闪】当作【杀】使用。" },
+      { name:"涯角", locked:true, text:"锁定技，你的手牌上限 +1。" }
+    ],
+    quote:"七进七出，有何惧哉！"
+  },
+  {
+    name:"诸葛亮", power:7, faction:"shu", hp:3, art:"art/zhugeliang.png",
+    skills:[
+      { name:"空城", locked:true, text:"锁定技，当你没有手牌时，你不能成为【杀】的目标。" },
+      { name:"观星", locked:true, text:"锁定技，你的摸牌阶段多摸一张牌，且手牌上限 +1。" }
+    ],
+    quote:"鞠躬尽瘁，死而后已。"
+  },
+  {
+    name:"貂蝉", power:6, faction:"qun", hp:3, art:"art/diaochan.png",
+    skills:[
+      { name:"离间", text:"出牌阶段限一次，你可以弃置一张手牌，令对方弃置两张手牌。" },
+      { name:"闭月", locked:true, text:"锁定技，你的摸牌阶段多摸一张牌。" }
+    ],
+    quote:"愿君怜取，且解君忧。"
+  },
+  {
+    name:"关羽", power:9, faction:"shu", hp:4, art:"art/guanyu.png",
+    skills:[
+      { name:"武圣", locked:true, text:"锁定技，每回合限一次，你使用的第一张【杀】不可被【闪】抵消，且伤害 +1。" },
+      { name:"义释", locked:true, text:"锁定技，你的手牌上限 +1。" }
+    ],
+    quote:"吾观尔等，如插标卖首耳。"
+  },
+  {
+    name:"张飞", power:10, faction:"shu", hp:4, art:"art/zhangfei.png",
+    skills:[
+      { name:"咆哮", locked:true, text:"锁定技，你出牌阶段可使用【杀】的次数 +1。" },
+      { name:"暴喝", locked:true, text:"锁定技，当你的【杀】造成伤害后，对方弃置一张手牌。" }
+    ],
+    quote:"燕人张翼德在此，谁敢决一死战！"
+  },
+  {
+    name:"马超", power:10, faction:"shu", hp:4, art:"art/machao.png",
+    skills:[
+      { name:"铁骑", locked:true, text:"锁定技，你使用【杀】造成的伤害 +1。" },
+      { name:"西凉", locked:true, text:"锁定技，你的摸牌阶段多摸一张牌。" }
+    ],
+    quote:"西凉铁骑，踏破中原！"
+  },
+  {
+    name:"势魏延", power:12, faction:"shi", hp:4, art:"art/weiyan.png",
+    skills:[
+      { name:"奇谋", text:"出牌阶段限一次，你可以弃置一张手牌，对对方造成 1 点伤害（不可被【闪】响应）。" },
+      { name:"勇烈", locked:true, text:"锁定技，你每回合使用的第一张【杀】伤害 +1。" }
+    ],
+    quote:"谁敢杀我！"
+  },
+  {
+    name:"势周瑜", power:11, faction:"shi", hp:4, art:"art/zhouyu.png",
+    skills:[
+      { name:"业火", text:"出牌阶段限一次，你可以弃置两张手牌，对对方造成 2 点伤害（不可被【闪】响应）。" },
+      { name:"顾曲", locked:true, text:"锁定技，你的摸牌阶段多摸一张牌。" }
+    ],
+    quote:"谈笑间，樯橹灰飞烟灭。"
+  },
+  {
+    name:"势邓艾", power:11, faction:"shi", hp:4, art:"art/dengai.png",
+    skills:[
+      { name:"凿险", locked:true, text:"锁定技，当你使用【杀】造成伤害后，你本回合使用【杀】的次数上限 +1。" },
+      { name:"阴平", locked:true, text:"锁定技，你的手牌上限 +1。" }
+    ],
+    quote:"间道险行，直取成都。"
+  }
+];
+
+const SUIT = { wei:["♠","#3B332A"], shu:["♥","#B03A2E"], wu:["♣","#3B332A"],
+             qun:["♦","#B03A2E"], shen:["★","#6D4C9F"], shi:["◆","#C86A27"] };
+function pcorner(c){
+  const t = SUIT[c.faction] || SUIT.qun;
+  const b = '<span class="s" style="color:'+t[1]+'">'+t[0]+'</span><span class="n" style="color:'+t[1]+'">'+(c.power||'?')+'</span>';
+  return '<div class="pcorner tl">'+b+'</div><div class="pcorner br">'+b+'</div>';
+}
+
+function orbs(n){
+  let s = "";
+  for(let i=0;i<n;i++) s += '<span class="orb"></span>';
+  return '<span class="orbs">'+s+'</span>';
+}
+
+document.getElementById('sheet').innerHTML = CARDS.map(c =>
+  '<div class="card '+c.faction+'">'+
+    pcorner(c)+
+    '<div class="head"><span class="name">'+c.name+'</span>'+orbs(c.hp)+'</div>'+
+    '<div class="art"><img src="'+c.art+'" alt=""></div>'+
+    '<div class="panel">'+
+      '<div class="skill-line" style="font-size:6.5pt;color:#9a9384;">势力 · '+FACTION[c.faction]+'</div>'+
+      c.skills.map(s =>
+        '<div class="skill'+(s.locked?' locked':'')+'"><b>'+s.name+'</b>：'+s.text+'</div>'
+      ).join('')+
+    '</div>'+
+    '<div class="quote">「'+c.quote+'」</div>'+
+    '<div class="foot">原创武将 · 家庭自用</div>'+
+  '</div>'
+).join('');
+</script>
+</body>
+</html>
