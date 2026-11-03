@@ -11,3 +11,7 @@ desktop.ini
 
 # 依赖
 node_modules/
+
+# Python 缓存
+__pycache__/
+*.pyc
