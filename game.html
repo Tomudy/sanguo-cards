@@ -59,6 +59,12 @@ button:disabled{opacity:.4;cursor:not-allowed;}
 .iskill{font-size:11px;color:#6b665c;margin-top:4px;line-height:1.5;}
 .iskill b{color:#4a453a;font-weight:700;}
 .iskill .locked-tag{color:#8a857a;font-size:10px;}
+/* 技能类型标签：锁定 / 触发 / 主动 —— 一眼看出这个技能什么时候生效 */
+.kind-tag{display:inline-block;font-size:9px;line-height:1.5;padding:0 4px;margin:0 3px;
+  border-radius:3px;vertical-align:1px;font-weight:700;letter-spacing:.5px;}
+.kind-tag.locked{color:#8a857a;background:#efece4;}
+.kind-tag.trigger{color:#2E5C8A;background:#e3ecf5;}
+.kind-tag.active{color:#8a5a1a;background:#f7ecdb;}
 .hp{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;}
 .pip{width:16px;height:16px;border-radius:50%;background:#C0392B;border:1px solid #8e2b20;}
 .pip.off{background:transparent;border-color:#c9c3b4;}
@@ -201,52 +207,52 @@ var SG = (function(){
   var CARDS = { slash:'杀', dodge:'闪', peach:'桃', wzsy:'无中生有' };
 
   var HEROES = [
-    { id:'boy', name:'小将军', faction:'shu', hp:4, power:9, handBonus:1, slashLimit:2,
-      skills:[{id:'ruiqi',name:'锐气',kind:'active',desc:'出牌阶段限一次，你可以弃置一张牌，然后摸两张牌。'},
-              {id:'shao_nian_zhi',name:'少年志',kind:'locked',desc:'锁定技，你的手牌上限 +1，且你出牌阶段可使用【杀】的次数 +1。'}] },
+    { id:'boy', name:'小将军', faction:'shu', hp:4, power:9, handBonus:0, slashLimit:2,
+      skills:[{id:'ruiqi',name:'锐气',kind:'active',desc:'出牌阶段限一次，你可以弃置一张手牌，然后摸两张牌。'},
+              {id:'shaonianzhi',name:'少年志',kind:'locked',desc:'锁定技，你的手牌上限按体力上限计算，不因受伤而降低。'}] },
     { id:'baiyu', name:'白羽先生', faction:'wei', hp:3, power:7, handBonus:0, slashLimit:1,
-      skills:[{id:'yusuan',name:'羽算',kind:'active',desc:'摸牌阶段，你可以多摸三张牌，然后弃置其中一张。'},
-              {id:'jinglan',name:'静澜',kind:'locked',desc:'每回合限一次，当你成为【杀】的目标时，你可以弃置一张基本牌，令此【杀】无效。'}] },
+      skills:[{id:'yusuan',name:'羽算',kind:'active',desc:'摸牌阶段，你可以额外摸三张牌、弃置一张手牌，且本回合可多使用一张【杀】。'},
+              {id:'jinglan',name:'静澜',kind:'trigger',desc:'每回合限一次，当你成为【杀】的目标时，你可以弃置一张手牌，令此【杀】无效，然后摸一张牌。'}] },
     { id:'qingluan', name:'青鸾', faction:'wu', hp:3, power:6, handBonus:0, slashLimit:1,
       skills:[{id:'chuanyang',name:'穿杨',kind:'locked',desc:'锁定技，当你的【杀】造成伤害后，你摸一张牌。'},
-              {id:'jinghong',name:'惊鸿',kind:'active',desc:'当你使用【闪】抵消【杀】后，你可以对使用者造成 1 点伤害。'}] },
-    { id:'gushan', name:'虎痴·关山', faction:'qun', hp:4, power:8, handBonus:0, slashLimit:1,
-      skills:[{id:'mengli',name:'猛力',kind:'locked',desc:'锁定技，你每回合使用的第一张【杀】伤害 +1。'},
-              {id:'douzhi',name:'斗志',kind:'locked',desc:'锁定技，当你受到伤害后，你摸一张牌。'}] },
+              {id:'jinghong',name:'惊鸿',kind:'trigger',desc:'当你使用【闪】抵消【杀】后，你可以对使用者造成 1 点伤害，然后摸一张牌。'}] },
+    { id:'gushan', name:'虎痴·关山', faction:'qun', hp:5, power:8, handBonus:0, slashLimit:1,
+      skills:[{id:'mengli',name:'猛力',kind:'locked',desc:'锁定技，当你已受伤时，你的【杀】伤害 +1。'},
+              {id:'douzhi',name:'斗志',kind:'locked',desc:'锁定技，当你受到伤害后，你摸两张牌；若你的体力值不多于 2，改为摸三张牌。'}] },
     { id:'lvbu', name:'吕布', faction:'qun', hp:4, power:9, handBonus:0, slashLimit:1,
-      skills:[{id:'wushuang',name:'无双',kind:'locked',desc:'锁定技，你使用【杀】时，对方需使用两张【闪】才能抵消。'},
-              {id:'xiaohu',name:'虓虎',kind:'locked',desc:'锁定技，你每回合使用的第一张【杀】伤害 +1。'}] },
-    { id:'zhaoyun', name:'赵云', faction:'shu', hp:4, power:8, handBonus:1, slashLimit:1,
+      skills:[{id:'wushuang',name:'无双',kind:'locked',desc:'锁定技，你使用【杀】时，对方需两张【闪】才能抵消；未能抵消则受到 2 点伤害。'},
+              {id:'xiaohu',name:'虓虎',kind:'locked',desc:'锁定技，当你的【杀】被【闪】抵消后，你弃置对方一张手牌。'}] },
+    { id:'zhaoyun', name:'赵云', faction:'shu', hp:4, power:8, handBonus:0, slashLimit:2,
       skills:[{id:'longdan',name:'龙胆',kind:'locked',desc:'锁定技，你可以将【杀】当【闪】、【闪】当【杀】使用。'},
-              {id:'yajiao',name:'涯角',kind:'locked',desc:'锁定技，你的手牌上限 +1。'}] },
-    { id:'zhugeliang', name:'诸葛亮', faction:'shu', hp:3, power:7, handBonus:1, slashLimit:1,
-      skills:[{id:'kongcheng',name:'空城',kind:'locked',desc:'锁定技，若你没有手牌，你不能成为【杀】的目标。'},
-              {id:'guanxing',name:'观星',kind:'locked',desc:'锁定技，你的摸牌阶段多摸一张牌，且手牌上限 +1。'}] },
-    { id:'diaochan', name:'貂蝉', faction:'qun', hp:3, power:6, handBonus:0, slashLimit:1,
+              {id:'yajiao',name:'涯角',kind:'locked',desc:'锁定技，你以此法转换使用牌后摸一张牌（每回合限两次）。'}] },
+    { id:'zhugeliang', name:'诸葛亮', faction:'shu', hp:4, power:7, handBonus:0, slashLimit:1,
+      skills:[{id:'kongcheng',name:'空城',kind:'locked',desc:'锁定技，当你使用【杀】时若手牌不多于一张，此【杀】伤害 +1；当你受到伤害后，你摸一张牌。'},
+              {id:'jiejian',name:'借箭',kind:'active',desc:'出牌阶段限一次，你可以弃置一张手牌，视为使用一张【杀】（不计入本回合出【杀】次数，且不可被【闪】抵消）。'}] },
+    { id:'diaochan', name:'貂蝉', faction:'qun', hp:4, power:6, handBonus:0, slashLimit:1,
       skills:[{id:'lijian',name:'离间',kind:'active',desc:'出牌阶段限一次，你可以弃置一张手牌，令对方弃置两张手牌。'},
-              {id:'biyue',name:'闭月',kind:'locked',desc:'锁定技，你的摸牌阶段多摸一张牌。'}] },
-    { id:'guanyu', name:'关羽', faction:'shu', hp:4, power:9, handBonus:1, slashLimit:1,
-      skills:[{id:'wusheng',name:'武圣',kind:'locked',desc:'锁定技，每回合限一次，你使用的第一张【杀】不可被【闪】抵消，且伤害 +1。'},
-              {id:'yishi',name:'义释',kind:'locked',desc:'锁定技，你的手牌上限 +1。'}] },
+              {id:'biyue',name:'闭月',kind:'trigger',desc:'每回合限一次，当你造成伤害后，你回复 1 点体力。'}] },
+    { id:'guanyu', name:'关羽', faction:'shu', hp:4, power:9, handBonus:0, slashLimit:2,
+      skills:[{id:'wusheng',name:'武圣',kind:'locked',desc:'锁定技，每回合你使用的第一张【杀】不可被【闪】抵消。'},
+              {id:'yishi',name:'义释',kind:'locked',desc:'锁定技，你使用【桃】不受每回合一次的限制，且使用【桃】后摸一张牌、本回合可多使用一张【杀】。'}] },
     { id:'zhangfei', name:'张飞', faction:'shu', hp:4, power:10, handBonus:0, slashLimit:2,
-      skills:[{id:'paoxiao',name:'咆哮',kind:'locked',desc:'锁定技，你出牌阶段可使用【杀】的次数 +1。'},
+      skills:[{id:'paoxiao',name:'咆哮',kind:'locked',desc:'锁定技，你出牌阶段可使用【杀】的次数 +1（共 2 次）。'},
               {id:'baohe',name:'暴喝',kind:'locked',desc:'锁定技，当你的【杀】造成伤害后，对方弃置一张手牌。'}] },
     { id:'machao', name:'马超', faction:'shu', hp:4, power:10, handBonus:0, slashLimit:1,
       skills:[{id:'tieji',name:'铁骑',kind:'locked',desc:'锁定技，你使用【杀】造成的伤害 +1。'},
-              {id:'xiliang',name:'西凉',kind:'locked',desc:'锁定技，你的摸牌阶段多摸一张牌。'}] },
-    { id:'jiangwei', name:'神姜维', faction:'shen', hp:4, power:13, handBonus:1, slashLimit:3,
+              {id:'xiliang',name:'西凉',kind:'locked',desc:'锁定技，每回合限一次，当你的【杀】被【闪】抵消后，你摸一张牌，且本回合可再使用一张【杀】。'}] },
+    { id:'jiangwei', name:'神姜维', faction:'shen', hp:4, power:13, handBonus:0, slashLimit:3,
       skills:[{id:'jiufa',name:'九伐',kind:'locked',desc:'锁定技，你出牌阶段可使用【杀】的次数上限为 3。'},
-              {id:'jizhi',name:'继志',kind:'locked',desc:'锁定技，你的手牌上限 +1。'},
-              {id:'danlie',name:'胆烈',kind:'locked',desc:'每局游戏限一次，当你的体力值变为 1 时，你摸三张牌。'}] },
+              {id:'jizhi',name:'继志',kind:'trigger',desc:'每局限一次，当你进入濒死状态时，无需【桃】即可回到 1 点体力。'},
+              {id:'danlie',name:'胆烈',kind:'trigger',desc:'每局限一次，当你的体力值变为 1 时，你摸两张牌。'}] },
     { id:'weiyan', name:'势魏延', faction:'shi', hp:4, power:12, handBonus:0, slashLimit:1,
-      skills:[{id:'qimou',name:'奇谋',kind:'active',desc:'出牌阶段限一次，你可以弃置一张手牌，对对方造成 1 点伤害。'},
-              {id:'yonglie',name:'勇烈',kind:'locked',desc:'锁定技，你每回合使用的第一张【杀】伤害 +1。'}] },
-    { id:'zhouyu', name:'势周瑜', faction:'shi', hp:4, power:11, handBonus:0, slashLimit:1,
+      skills:[{id:'qimou',name:'奇谋',kind:'active',desc:'出牌阶段限一次，你可以弃置一张手牌，对对方造成 1 点伤害，然后摸一张牌。'},
+              {id:'yonglie',name:'勇烈',kind:'locked',desc:'锁定技，你可以将【桃】当【杀】使用。'}] },
+    { id:'zhouyu', name:'势周瑜', faction:'shi', hp:3, power:11, handBonus:0, slashLimit:1,
       skills:[{id:'yehuo',name:'业火',kind:'active',desc:'出牌阶段限一次，你可以弃置两张手牌，对对方造成 2 点伤害。'},
-              {id:'guqu',name:'顾曲',kind:'locked',desc:'锁定技，你的摸牌阶段多摸一张牌。'}] },
-    { id:'dengai', name:'势邓艾', faction:'shi', hp:4, power:11, handBonus:1, slashLimit:1,
-      skills:[{id:'zaoxian',name:'凿险',kind:'locked',desc:'锁定技，当你的【杀】造成伤害后，本回合你使用【杀】的次数 +1。'},
-              {id:'yinping',name:'阴平',kind:'locked',desc:'锁定技，你的手牌上限 +1。'}] }
+              {id:'guqu',name:'顾曲',kind:'locked',desc:'锁定技，你发动【业火】后摸一张牌。'}] },
+    { id:'dengai', name:'势邓艾', faction:'shi', hp:4, power:11, handBonus:0, slashLimit:1,
+      skills:[{id:'zaoxian',name:'凿险',kind:'locked',desc:'锁定技，每回合限一次，当你的【杀】造成伤害后，本回合你使用【杀】的次数 +1。'},
+              {id:'yinping',name:'阴平',kind:'locked',desc:'锁定技，你本回合使用的第二张及之后的【杀】不可被【闪】抵消，且伤害 +1。'}] }
   ];
 
   function rngFrom(seed){
@@ -262,8 +268,8 @@ var SG = (function(){
   function buildDeck(){
     var d = [];
     var i;
-    for(i=0;i<20;i++) d.push('slash');
-    for(i=0;i<12;i++) d.push('dodge');
+    for(i=0;i<22;i++) d.push('slash');
+    for(i=0;i<10;i++) d.push('dodge');
     for(i=0;i<6;i++) d.push('peach');
     for(i=0;i<6;i++) d.push('wzsy');
     return d;
@@ -306,7 +312,13 @@ var SG = (function(){
     if(st.log.length > 120) st.log.shift();
   }
 
-  function maxHand(st, p){ return Math.max(0, st.p[p].hp) + st.p[p].hero.handBonus; }
+  /* 手牌上限：默认随体力下降；【少年志】改为按体力上限算（受伤不掉手牌空间） */
+  function maxHand(st, p){
+    var pl = st.p[p];
+    var base = has(pl, 'shaonianzhi') ? pl.maxHp : Math.max(0, pl.hp);
+    var lim = Math.max(0, base) + (pl.hero.handBonus || 0);
+    return lim;
+  }
 
   function draw(st, p, n){
     for(var i=0;i<n;i++){
@@ -332,7 +344,14 @@ var SG = (function(){
     st.p[p].used.qimou = false;
     st.p[p].used.yehuo = false;
     st.p[p].used.lijian = false;
+    st.p[p].used.zhijian = false;
     st.p[p].used.wusheng = false;
+    st.p[p].used.biyue = false;
+    st.p[p].used.xiliang = false;
+    st.p[p].used.zaoxian = false;
+    st.p[p].used.kongcheng = false;
+    st.p[p].used.yajiao = 0;
+    st.p[p].used.yishiBonus = false;
     if(has(st.p[p], 'yusuan')){
       st.awaiting = { p:p, type:'yusuan' };
       return;
@@ -342,7 +361,7 @@ var SG = (function(){
 
   function doDrawPhase(st){
     var p = st.turn;
-    var n = (has(st.p[p],'guqu') || has(st.p[p],'guanxing') || has(st.p[p],'biyue') || has(st.p[p],'xiliang')) ? 3 : 2;
+    var n = 2;
     draw(st, p, n);
     st.events.push({ type:'draw', p:p });
     say(st, st.p[p].name + ' 摸 ' + n + ' 张牌。', p);
@@ -350,12 +369,15 @@ var SG = (function(){
     st.phase = 'play';
   }
 
+  /* 【羽算】：不是简单多摸，而是"摸得多、但要扔掉两张"——用来换掉手里的废牌 */
   function doYusuan(st, use){
     var p = st.turn;
     if(use){
       draw(st, p, 3);
-      say(st, st.p[p].name + ' 发动【羽算】，摸 3 张后保留 2 张。', p);
-      st.awaiting = { p:p, type:'keep', n:2 };
+      st.events.push({ type:'skill', p:p });
+      say(st, st.p[p].name + ' 发动【羽算】，额外摸 3 张牌、弃掉 1 张，本回合可多出一刀。', p);
+      st.slashBonus = (st.slashBonus || 0) + 1;
+      st.awaiting = { p:p, type:'trim', n:1 };
     } else {
       doDrawPhase(st);
     }
@@ -379,15 +401,27 @@ var SG = (function(){
     var out = { slash:false, peach:false, wzsy:false, ruiqi:false, end:true };
     if(!canAct(st)) return out;
     var p = st.turn, h = st.p[p].hand;
-    var opp = 1 - p, oppBlocked = has(st.p[opp],'kongcheng') && st.p[opp].hand.length === 0;
-    out.slash = (h.indexOf('slash') >= 0 || (has(st.p[p],'longdan') && h.indexOf('dodge') >= 0)) &&
+    var opp = 1 - p, oppBlocked = false;
+    /* 能用什么当【杀】：真杀；赵云闪当杀；魏延桃当杀 */
+    var canSlashCard = h.indexOf('slash') >= 0 ||
+      (has(st.p[p],'longdan') && h.indexOf('dodge') >= 0) ||
+      (has(st.p[p],'yonglie') && h.indexOf('peach') >= 0);
+    out.slash = canSlashCard &&
                 st.slashUsed < st.p[p].hero.slashLimit + (st.slashBonus || 0) && !oppBlocked;
     out.lijian = has(st.p[p],'lijian') && !st.p[p].used.lijian && h.length > 0 && st.p[opp].hand.length > 0;
-    out.peach = h.indexOf('peach') >= 0 && st.p[p].hp < st.p[p].maxHp && !st.p[p].used.peach;
+    /* 义释：关羽吃桃不限次数 */
+    /* 义释：用过【桃】之后，本回合还能再补一刀 */
+    if(has(st.p[p],'yishi') && st.p[p].used.peach && !st.p[p].used.yishiBonus){
+      st.p[p].used.yishiBonus = true; st.slashBonus = (st.slashBonus || 0) + 1;
+    }
+    out.peach = h.indexOf('peach') >= 0 && st.p[p].hp < st.p[p].maxHp &&
+                (has(st.p[p],'yishi') || !st.p[p].used.peach);
     out.wzsy = h.indexOf('wzsy') >= 0;
     out.ruiqi = has(st.p[p], 'ruiqi') && !st.p[p].used.ruiqi && h.length > 0;
     out.qimou = has(st.p[p], 'qimou') && !st.p[p].used.qimou && h.length > 0;
     out.yehuo = has(st.p[p], 'yehuo') && !st.p[p].used.yehuo && h.length >= 2;
+    /* 借箭：不占本回合出刀次数，只受每回合一次的技能限制 */
+    out.zhijian = has(st.p[p], 'jiejian') && !st.p[p].used.zhijian && h.length >= 1 && !oppBlocked;
     return out;
   }
 
@@ -397,61 +431,106 @@ var SG = (function(){
     return c;
   }
 
-  function doSlash(st){
+  /* 【涯角】：龙胆转换牌后摸一张（每回合限两次） */
+  function yajiao(st, p){
+    if(!has(st.p[p],'yajiao')) return;
+    var u = st.p[p].used;
+    if((u.yajiao || 0) >= 2) return;
+    u.yajiao = (u.yajiao || 0) + 1;
+    draw(st, p, 1);
+    st.events.push({ type:'skill', p:p });
+    say(st, st.p[p].name + ' 发动【涯角】，牌势流转，摸 1 张。', p);
+  }
+
+  function doSlash(st, virtual, noCount, forceNoDodge){
     var p = st.turn, h = st.p[p].hand, t = 1-p;
-    if(has(st.p[t],'kongcheng') && st.p[t].hand.length === 0){
-      say(st, st.p[t].name + ' 使出【空城】——手中无牌，无法成为【杀】的目标！', t);
-      st.events.push({ type:'dodge', p:t });
-      return;
+    var ghost = '';
+    if(!virtual){
+      /* 拿什么当【杀】：真杀 > 赵云把闪当杀 > 魏延把桃当杀 */
+      var i = h.indexOf('slash');
+      if(i < 0 && has(st.p[p],'longdan')){
+        i = h.indexOf('dodge');
+        if(i >= 0) ghost = 'longdan';
+      }
+      if(i < 0 && has(st.p[p],'yonglie')){
+        i = h.indexOf('peach');
+        if(i >= 0) ghost = 'yonglie';
+      }
+      if(i < 0) return;
+      discardCard(st, p, i);
+      if(ghost === 'longdan'){
+        say(st, st.p[p].name + ' 发动【龙胆】，把【闪】当【杀】掷出。', p);
+        yajiao(st, p);
+      } else if(ghost === 'yonglie'){
+        st.events.push({ type:'skill', p:p });
+        say(st, st.p[p].name + ' 不计代价！【勇烈】将【桃】当【杀】砍出。', p);
+      }
     }
-    var i = h.indexOf('slash');
-    var asDodge = false;
-    if(i < 0 && has(st.p[p],'longdan')){ i = h.indexOf('dodge'); asDodge = true; }
-    if(i < 0) return;
-    discardCard(st, p, i);
-    st.slashUsed++;
+    if(!noCount) st.slashUsed++;
+    else st.slashFree = (st.slashFree || 0) + 1;
+
     var dmg = 1;
-    if((has(st.p[p],'mengli') || has(st.p[p],'yonglie') || has(st.p[p],'xiaohu')) && st.slashUsed === 1) dmg = 2;
-    if(has(st.p[p],'tieji')) dmg = 2;
-    var noDodge = false;
+    if(has(st.p[p],'tieji')) dmg += 1;                                   /* 马超：恒定加重 */
+    if(has(st.p[p],'mengli') && st.p[p].hp < st.p[p].maxHp) dmg += 1;    /* 关山：带伤更狠 */
+    if(has(st.p[p],'kongcheng') && st.p[p].hand.length <= 1){
+      dmg += 1;                                                         /* 诸葛亮：空手出刀更重 */
+      say(st, st.p[p].name + ' 手中几乎无牌，【空城】反倒成了杀招，伤害 +1！', p);
+    }
+
+    /* 三种"闪不掉"，触发条件各不相同 */
+    var noDodge = false, note = '';
     if(has(st.p[p],'wusheng') && !st.p[p].used.wusheng){
       st.p[p].used.wusheng = true;
-      noDodge = true;
-      dmg = Math.max(dmg, 2);
+      noDodge = true; note = '【武圣】本回合第一刀，势不可挡！';
+    }
+    if(has(st.p[p],'yinping') && st.slashUsed >= 2){
+      noDodge = true; dmg += 1; note = '【阴平】小路奇袭，第二刀无从招架！';
+    }
+    if(forceNoDodge && !noDodge){
+      noDodge = true; note = '【借箭】十万支箭已到手，铺天盖地无从闪避！';
     }
     st.events.push({ type:'slash', p:p, dmg:dmg });
     say(st, st.p[p].name + ' 对 ' + st.p[1-p].name + ' 使用【杀】' + (dmg>1?'（伤害 +1）':'') + '。', p);
-    askDodge(st, 1-p, p, dmg, true, noDodge);
+    askDodge(st, 1-p, p, dmg, true, noDodge, note);
   }
 
-  function askDodge(st, target, from, dmg, chain, noDodge){
+  function askDodge(st, target, from, dmg, chain, noDodge, note){
     if(noDodge){
       st.events.push({ type:'skill', p:from });
-      say(st, st.p[from].name + ' 发动【武圣】——这一刀势如破竹，无法闪避！', from);
+      say(st, st.p[from].name + ' ' + note, from);
     }
     var need = has(st.p[from],'wushuang') ? 2 : 1;
     var hasDodge = !noDodge && (st.p[target].hand.indexOf('dodge') >= 0 ||
       (has(st.p[target],'longdan') && st.p[target].hand.indexOf('slash') >= 0));
     var jl = false;
-    if(has(st.p[target],'jinglan') && !st.p[target].used.jinglan){
-      for(var i=0;i<st.p[target].hand.length;i++){
-        var c = st.p[target].hand[i];
-        if(c==='slash'||c==='dodge'||c==='peach'){ jl = i; break; }
-      }
+    if(has(st.p[target],'jinglan') && !st.p[target].used.jinglan && st.p[target].hand.length){
+      jl = autoDropIdx(st.p[target].hand);
     }
     if(jl !== false){
       st.awaiting = { p:target, type:'jinglan', cardIdx:jl, from:from, dmg:dmg, chain:chain };
       return;
     }
-    st.awaiting = { p:target, type:'dodge', from:from, dmg:dmg, chain:chain, canDodge:hasDodge, need:need, noDodge:!!noDodge };
+    st.awaiting = { p:target, type:'dodge', from:from, dmg:dmg, chain:chain,
+                    canDodge:hasDodge, need:need, noDodge:!!noDodge, note:note || '' };
   }
 
   function resolveDodge(st, useDodge){
     var a = st.awaiting, t = a.p, f = a.from;
+    /* 兜底：声称出闪但手里其实没有（或本就不能闪），按硬吃结算，绝不 splice(-1) */
+    if(useDodge && !a.canDodge) useDodge = false;
+    if(useDodge && st.p[t].hand.indexOf('dodge') < 0 &&
+       !(has(st.p[t],'longdan') && st.p[t].hand.indexOf('slash') >= 0)) useDodge = false;
     if(useDodge){
-      var i = st.p[t].hand.indexOf('dodge');
-      if(i < 0 && has(st.p[t],'longdan')) i = st.p[t].hand.indexOf('slash');
+      var i = st.p[t].hand.indexOf('dodge'), ghost = '';
+      if(i < 0 && has(st.p[t],'longdan')){
+        i = st.p[t].hand.indexOf('slash');
+        if(i >= 0) ghost = 'longdan';
+      }
       discardCard(st, t, i);
+      if(ghost === 'longdan'){
+        say(st, st.p[t].name + ' 发动【龙胆】，把【杀】当【闪】来用。', t);
+        yajiao(st, t);
+      }
       st.events.push({ type:'dodge', p:t });
       if(a.need && a.need > 1){
         say(st, st.p[t].name + ' 使用【闪】挡下第一刀，但【无双】余威犹在，还需再出一张【闪】！', t);
@@ -460,6 +539,19 @@ var SG = (function(){
         return;
       }
       say(st, st.p[t].name + ' 使用【闪】抵消了这次【杀】。', t);
+      /* 攻击方的"被闪开"补偿：姜维摸牌 / 吕布拆牌 —— 一个换资源，一个拆防守 */
+      if(has(st.p[f],'xiliang') && !st.p[f].used.xiliang){
+        st.p[f].used.xiliang = true;
+        st.slashBonus = (st.slashBonus || 0) + 1;
+        draw(st, f, 1);
+        st.events.push({ type:'skill', p:f });
+        say(st, st.p[f].name + ' 铁骑追击！【西凉】摸 1 张牌，本回合可再出一刀。', f);
+      }
+      if(has(st.p[f],'xiaohu') && st.p[t].hand.length > 0){
+        var dc = discardCard(st, t, autoDropIdx(st.p[t].hand, ['dodge','peach','slash','wzsy']));
+        st.events.push({ type:'skill', p:f });
+        say(st, st.p[f].name + ' 一声虎啸！【虓虎】逼得 ' + st.p[t].name + ' 弃置【' + CARDS[dc] + '】。', f);
+      }
       if(has(st.p[t],'jinghong')){
         st.awaiting = { p:t, type:'jinghong' };
         return;
@@ -469,15 +561,23 @@ var SG = (function(){
       return;
     }
     st.awaiting = null;
-    dealDamage(st, t, a.dmg, f);
+    var hitDmg = a.dmg;
+    if(has(st.p[f],'wushuang')){
+      hitDmg += 1;
+      say(st, st.p[f].name + ' 的【无双】无人可挡，伤害 +1！', f);
+    }
+    dealDamage(st, t, hitDmg, f);
     if(!st.over){
       if(has(st.p[f],'chuanyang')){
         draw(st, f, 1);
         say(st, st.p[f].name + ' 发动【穿杨】，摸 1 张牌。', f);
       }
-      if(has(st.p[f],'zaoxian')){
+      if(has(st.p[f],'zaoxian') && !st.p[f].used.zaoxian){
+        st.p[f].used.zaoxian = true;
         st.slashBonus = (st.slashBonus || 0) + 1;
-        say(st, st.p[f].name + ' 发动【凿险】，本回合出【杀】次数 +1。', f);
+        draw(st, f, 1);
+        st.events.push({ type:'skill', p:f });
+        say(st, st.p[f].name + ' 发动【凿险】，本回合出【杀】次数 +1，摸 1 张牌。', f);
       }
       if(has(st.p[f],'baohe') && st.p[t].hand.length > 0){
         /* 暴喝：自动弃掉对方一张防守价值最高的手牌 */
@@ -500,7 +600,10 @@ var SG = (function(){
     st.p[t].used.jinglan = true;
     if(use){
       var c = discardCard(st, t, a.cardIdx);
+      st.events.push({ type:'skill', p:t });
       say(st, st.p[t].name + ' 发动【静澜】，弃置【' + CARDS[c] + '】，此【杀】无效。', t);
+      draw(st, t, 1);
+      say(st, st.p[t].name + ' 借势回手，摸 1 张牌。', t);
       st.awaiting = null;
       afterAction(st);
       return;
@@ -515,6 +618,7 @@ var SG = (function(){
     if(use){
       st.events.push({ type:'skill', p:t });
       say(st, st.p[t].name + ' 发动【惊鸿】，反手一箭！', t);
+      draw(st, t, 1);
       st.awaiting = null;
       dealDamage(st, from, 1, t);
       if(!st.over) afterAction(st);
@@ -529,13 +633,40 @@ var SG = (function(){
     st.events.push({ type:'damage', p:t, n:n });
     say(st, st.p[t].name + ' 失去 ' + n + ' 点体力（剩余 ' + Math.max(0,st.p[t].hp) + '）。', t);
     if(has(st.p[t],'douzhi')){
+      /* 斗志：越到残血越凶，摸牌数随伤势加重 */
+      var dn = st.p[t].hp <= 2 ? 3 : 2;
+      draw(st, t, dn);
+      say(st, st.p[t].name + ' 发动【斗志】，挨打更来劲，摸 ' + dn + ' 张牌。', t);
+    }
+    /* 【空城】：空手时挨打反而清醒，摸一张牌 */
+    if(has(st.p[t],'kongcheng') && st.p[t].hand.length <= 1){
       draw(st, t, 1);
-      say(st, st.p[t].name + ' 发动【斗志】，摸 1 张牌。', t);
+      st.events.push({ type:'skill', p:t });
+      say(st, st.p[t].name + ' 手中空空，反倒无牵无挂，【空城】摸 1 张牌。', t);
+    }
+    /* 【闭月】：打出伤害的人回血（每回合一次，满血时不浪费） */
+    if(from !== undefined && from !== null && has(st.p[from],'biyue') &&
+       !st.p[from].used.biyue && st.p[from].hp < st.p[from].maxHp){
+      st.p[from].used.biyue = true;
+      st.p[from].hp = Math.min(st.p[from].maxHp, st.p[from].hp + 1);
+      st.events.push({ type:'heal', p:from });
+      say(st, '🌙 ' + st.p[from].name + ' 发动【闭月】，月华滋养，回复 1 点体力。', from);
+    }
+    /* 【继志】：每局一次，濒死时凭意志撑回 1 点体力（不用【桃】） */
+    if(st.p[t].hp <= 0 && has(st.p[t],'jizhi') && !st.p[t].used.jizhi){
+      st.p[t].used.jizhi = true;
+      st.p[t].hp = 1;
+      st.p[t].dying = false;
+      st.events.push({ type:'skill', p:t });
+      say(st, '🔥 ' + st.p[t].name + ' 壮志未酬！【继志】硬撑回到 1 点体力。', t);
+      st.awaiting = null;
+      afterAction(st);
+      return;
     }
     if(has(st.p[t],'danlie') && !st.p[t].used.danlie && st.p[t].hp === 1){
       st.p[t].used.danlie = true;
-      draw(st, t, 3);
-      say(st, st.p[t].name + ' 胆大如斗！【胆烈】发动：摸 3 张牌。', t);
+      draw(st, t, 2);
+      say(st, st.p[t].name + ' 胆大如斗！【胆烈】发动：摸 2 张牌。', t);
     }
     if(st.p[t].hp <= 0){
       st.p[t].hp = 0;
@@ -588,12 +719,18 @@ var SG = (function(){
 
   function doPeach(st){
     var p = st.turn, i = st.p[p].hand.indexOf('peach');
-    if(i < 0 || st.p[p].hp >= st.p[p].maxHp || st.p[p].used.peach) return;
+    if(i < 0 || st.p[p].hp >= st.p[p].maxHp) return;
+    /* 【义释】：关羽吃桃不限每回合一次 */
+    if(st.p[p].used.peach && !has(st.p[p],'yishi')) return;
     discardCard(st, p, i);
     st.p[p].used.peach = true;
     st.p[p].hp = Math.min(st.p[p].maxHp, st.p[p].hp + 1);
     st.events.push({ type:'heal', p:p });
     say(st, st.p[p].name + ' 使用【桃】，回复 1 点体力。', p);
+    if(has(st.p[p],'yishi')){
+      draw(st, p, 1);
+      say(st, st.p[p].name + ' 【义释】以德服人，摸 1 张牌。', p);
+    }
   }
 
   function doWzsy(st){
@@ -644,6 +781,22 @@ var SG = (function(){
     return 0;
   }
 
+  /* 【借箭】：弃一张手牌，视为使用一张【杀】（诸葛亮的出刀手段） */
+  function doZhijian(st, idxs){
+    var p = st.turn, h = st.p[p].hand;
+    if(st.p[p].used.zhijian || h.length < 1) return;
+    st.p[p].used.zhijian = true;
+    idxs = (idxs || []).filter(function(x){ return x >= 0 && x < h.length; })
+                       .slice(0,1).sort(function(x,y){ return y-x; });
+    var drop = [], k;
+    for(k=0;k<idxs.length;k++) drop.push(discardCard(st, p, idxs[k]));
+    if(!drop.length) drop.push(discardCard(st, p, autoDropIdx(st.p[p].hand, ['wzsy','dodge','slash','peach'])));
+    if(!drop.length) return;
+    st.events.push({ type:'skill', p:p });
+    say(st, st.p[p].name + ' 草船【借箭】，弃置【' + CARDS[drop[0]] + '】，当作一张【杀】放出。', p);
+    doSlash(st, true, true, true);
+  }
+
   function doQimou(st, idx){
     var p = st.turn;
     if(st.p[p].used.qimou || !st.p[p].hand.length) return;
@@ -653,6 +806,10 @@ var SG = (function(){
     st.events.push({ type:'skill', p:p });
     say(st, st.p[p].name + ' 发动【奇谋】，弃置【' + CARDS[c] + '】，直取一击（不可闪避）！', p);
     directDamage(st, 1-p, 1, p);
+    if(!st.over){
+      draw(st, p, 1);
+      say(st, st.p[p].name + ' 一击得手，趁势摸 1 张牌。', p);
+    }
     if(!st.over) afterAction(st);
   }
 
@@ -677,6 +834,12 @@ var SG = (function(){
     say(st, st.p[p].name + ' 发动【业火】，弃置【' + CARDS[drop[0]] + '】【' + CARDS[drop[1]] +
       '】，火烧连营（2 点伤害，不可闪避）！', p);
     directDamage(st, 1-p, 2, p);
+    /* 【顾曲】：业火是"烧完还能补牌"的技能，避免弃两牌后手牌见底 */
+    if(!st.over && has(st.p[p],'guqu')){
+      draw(st, p, 1);
+      st.events.push({ type:'skill', p:p });
+      say(st, st.p[p].name + ' 一曲既毕，【顾曲】摸回 1 张牌。', p);
+    }
     if(!st.over) afterAction(st);
   }
 
@@ -726,7 +889,7 @@ var SG = (function(){
       if(a.type==='yusuan') return { t:'yusuan', use:true };
       if(a.type==='keep'){
         var keep = [];
-        var order = ['peach','slash','wzsy','dodge'];
+        var order = ['peach','dodge','slash','wzsy'];
         for(var k=0;k<order.length && keep.length<a.n;k++){
           var i = h.indexOf(order[k]);
           if(i>=0) keep.push(i);
@@ -734,17 +897,28 @@ var SG = (function(){
         for(var j=0;j<h.length && keep.length<a.n;j++) if(keep.indexOf(j)<0) keep.push(j);
         return { t:'keep', idxs:keep };
       }
+      if(a.type==='trim'){
+        var priT = { wzsy:0, slash:2, dodge:4, peach:6 }, arrT = [], dd = [];
+        for(var mT=0;mT<h.length;mT++){
+          var vT = priT[h[mT]];
+          arrT.push({ i:mT, v:(vT===undefined?4:vT) });
+        }
+        arrT.sort(function(x,y){ return x.v - y.v; });
+        for(var qT=0;qT<a.n && qT<arrT.length;qT++) dd.push(arrT[qT].i);
+        return { t:'trim', idxs:dd };
+      }
       if(a.type==='dying') return { t:'dying', use: h.indexOf('peach') >= 0 };
       if(a.type==='save') return { t:'save', use:false };
-      if(a.type==='jinglan') return { t:'jinglan', use: a.dmg >= 2 || st.p[p].hp <= 1 };
+      if(a.type==='jinglan') return { t:'jinglan', use: true };
       if(a.type==='dodge'){
-        var hasDodge = h.indexOf('dodge') >= 0 || (has(st.p[p],'longdan') && h.indexOf('slash') >= 0);
-        var use = hasDodge && (st.p[p].hp <= a.dmg || st.p[p].hp <= 2);
+        var hasDodge = a.canDodge && (h.indexOf('dodge') >= 0 || (has(st.p[p],'longdan') && h.indexOf('slash') >= 0));
+        var worth = a.dmg + (has(st.p[p],'jinghong') ? 1 : 0);   /* 惊鸿：闪完还能反打一点 */
+        var use = hasDodge && (st.p[p].hp <= a.dmg || st.p[p].hp <= 2 || worth >= 2);
         return { t:'dodge', use:use };
       }
       if(a.type==='jinghong') return { t:'jinghong', use:true };
       if(a.type==='discard'){
-        var drop = [], prio = { dodge:0, wzsy:2, slash:3, peach:5 };
+        var drop = [], prio = { wzsy:0, slash:2, dodge:4, peach:6 };
         var arr = [];
         for(var m=0;m<h.length;m++) arr.push({ i:m, v:prio[h[m]] });
         arr.sort(function(x,y){ return x.v - y.v; });
@@ -756,6 +930,11 @@ var SG = (function(){
     if(L.peach && st.p[p].hp <= 1) return { t:'peach' };
     if(L.yehuo && hh.length >= 3) return { t:'yehuo' };
     if(L.lijian && hh.length >= 3) return { t:'lijian' };
+    /* 魏延：只有桃没杀时才拿桃当杀，且血少时不烧桃 */
+    var realSlash = hh.indexOf('slash') >= 0 || (has(st.p[p],'longdan') && hh.indexOf('dodge') >= 0);
+    if(L.slash && !realSlash && hh.indexOf('peach') >= 0 && st.p[p].hp <= 2) L.slash = false;
+    /* 诸葛亮：手牌少时先借箭，弃到空手正好触发【空城】加重 */
+    if(L.zhijian && (hh.length <= 2 || hh.indexOf('slash') < 0)) return { t:'zhijian' };
     if(L.slash) return { t:'slash' };
     if(L.qimou && hh.length >= 2) return { t:'qimou' };
     if(L.wzsy && hh.length <= 3) return { t:'wzsy' };
@@ -775,7 +954,8 @@ var SG = (function(){
     if(!mv || st.over) return;
     switch(mv.t){
       case 'yusuan': doYusuan(st, mv.use); break;
-      case 'keep': /* 羽算保留 */ finishKeep(st, mv.idxs); break;
+      case 'keep': finishKeep(st, mv.idxs); break;   /* 兼容旧存档 */
+      case 'trim': doTrim(st, mv.idxs); break;
       case 'jinglan': resolveJinglan(st, mv.use); break;
       case 'dodge': resolveDodge(st, mv.use); break;
       case 'jinghong': doJinghong(st, mv.use); break;
@@ -789,8 +969,26 @@ var SG = (function(){
       case 'qimou': doQimou(st, mv.idx); break;
       case 'lijian': doLijian(st, mv.idx); break;
       case 'yehuo': doYehuo(st, mv.idxs); break;
+      case 'zhijian': doZhijian(st, mv.idxs); break;
       case 'end': endTurn(st); break;
     }
+  }
+
+  /* 【羽算】的收尾：从手里挑 n 张丢掉，然后照常进出牌阶段 */
+  function doTrim(st, idxs){
+    var a = st.awaiting, p = a.p, h = st.p[p].hand, i;
+    idxs = (idxs || []).filter(function(x){ return x >= 0 && x < h.length; })
+                       .slice(0, a.n).sort(function(x,y){ return y-x; });
+    var drop = [];
+    for(i=0;i<idxs.length;i++) drop.push(discardCard(st, p, idxs[i]));
+    while(drop.length < a.n && st.p[p].hand.length){
+      drop.push(discardCard(st, p, autoDropIdx(st.p[p].hand)));
+    }
+    if(drop.length){
+      say(st, st.p[p].name + ' 弃置 ' + drop.map(function(c){ return '【' + CARDS[c] + '】'; }).join('') + '。', p);
+    }
+    st.awaiting = null;
+    st.phase = 'play';
   }
 
   function finishKeep(st, idxs){
@@ -834,25 +1032,27 @@ function corner(h){
 var FC = { wei:'#2E5C8A', shu:'#3B7A3B', wu:'#B03A2E', qun:'#9A7B0A', shen:'#6D4C9F', shi:'#C86A27' };
 var CN = { slash:'杀', dodge:'闪', peach:'桃', wzsy:'无中生有' };
 var DESC = { slash:'攻击对手，对方不出闪则掉血', dodge:'抵消一次杀', peach:'回复 1 点体力', wzsy:'立即摸 2 张牌' };
+/* 技能类型标签文案 */
+var KINDS = { locked:'锁定', trigger:'触发', active:'主动' };
 
 var myHero = 'boy', mode = 'ai', G = null, sel = [], muted = false, busy = false;
 
 var HINT = {
-  boy:'每回合可出 2 次杀，还能弃 1 摸 2（新手首选）',
-  baiyu:'摸 3 留 2 挑好牌，每回合免疫 1 次杀',
-  qingluan:'用闪就反手打 1 点伤害，杀中后摸牌',
-  gushan:'每回合第一张杀伤害 +1，受伤就摸牌',
-  jiangwei:'每回合最多 3 次杀，残血爆发（最强）',
-  weiyan:'弃 1 张牌就打 1 点必中伤害，首杀伤害 +1',
-  zhouyu:'弃 2 张牌火烧 2 点必中伤害，每回合多摸 1 张',
-  dengai:'杀中一次就多一次出杀机会，滚雪球越打越猛',
-  lvbu:'对方要出两张闪才挡得住，首杀还加伤',
-  zhaoyun:'杀可以当闪、闪可以当杀，攻守一体',
-  zhugeliang:'手里没牌时，敌人根本砍不到你',
-  diaochan:'弃 1 张牌，逼对方连丢 2 张',
-  guanyu:'每回合一刀 2 点必中，稳稳砍中',
-  zhangfei:'每回合 2 次杀，砍中还逼对方弃牌',
-  machao:'每一刀都是 2 点伤害，还多摸牌'
+  boy:'两刀在手，弃 1 摸 2 换资源，受伤也不缩手牌上限（新手首选）',
+  baiyu:'摸得多还能挑着丢，本回合多一刀；关键一杀直接废掉再摸一张',
+  qingluan:'杀中补牌；闪成功不吃亏，反手一箭还摸一张',
+  gushan:'五血厚皮，血越少刀越重，每挨一下补三张牌',
+  lvbu:'两张闪才挡得住，挡不住就是 2 点；被闪掉也要拆你一张',
+  zhaoyun:'杀闪互换、换完补牌，一回合能换两次，攻守一体',
+  zhugeliang:'借箭当刀用、不占出刀次数，弃到空手伤害反而 +1',
+  diaochan:'弃 1 张逼对方丢 2 张，打中还能回 1 血',
+  guanyu:'第一刀闪不掉，桃子想吃几个吃几个，吃完还能再补一刀',
+  zhangfei:'两刀连砍，砍中就逼对方弃牌',
+  machao:'每刀恒定 2 点，被闪掉立刻追击摸牌再补一刀',
+  jiangwei:'一回合三刀，濒死自动撑住，残血再摸两张',
+  weiyan:'弃 1 张换 1 点必中伤害还补牌，急眼了拿桃当杀',
+  zhouyu:'弃 2 张烧 2 点，烧完还能补回一张',
+  dengai:'砍中一次就多一刀还补牌，第二刀起闪不掉且伤害 +1'
 };
 
 function renderPicks(){
@@ -902,7 +1102,8 @@ function face(pid){
       st.s + ' 战力 ' + pl.hero.power + '</b> · ' + pl.hero.skills.map(function(s){return '【'+s.name+'】';}).join('') + '</div>' +
     '<div class="hp">' + pips + '<span class="hnum">' + Math.max(0,pl.hp) + '/' + pl.maxHp + '</span></div>' +
     '<div class="iskill">' + pl.hero.skills.map(function(s){
-        return '<b>【' + s.name + '】</b>' + (s.kind==='locked'?'<span class="locked-tag">锁定</span> ':'') + s.desc;
+        return '<b>【' + s.name + '】</b><span class="kind-tag ' + (s.kind || 'active') + '">' +
+          (KINDS[s.kind] || '主动') + '</span>' + s.desc;
       }).join('<br>') + '</div>' +
     '</div>' +
     '<div class="handcnt">手牌 ' + pl.hand.length + '</div>' +
@@ -968,7 +1169,7 @@ function tapCard(i){
   var a = G.awaiting, vi = viewIdx();
   var c = G.p[vi].hand[i];
   SFX.click();
-  if(a && a.type==='keep'){
+  if(a && (a.type==='keep' || a.type==='trim')){
     if(sel.indexOf(i)>=0) sel = sel.filter(function(x){return x!==i;});
     else if(sel.length < a.n) sel.push(i);
     render(); return;
@@ -997,7 +1198,12 @@ function tapCard(i){
   if(a && a.type==='yusuan') return;
   var L = SG.legal(G);
   if((c==='slash' || (c==='dodge' && SG.has(G.p[vi],'longdan'))) && L.slash){ SG.apply(G,{t:'slash'}); after(); return; }
-  if(c==='peach'){ if(L.peach){ SG.apply(G,{t:'peach'}); after(); } else flash('体力已满，吃桃浪费了。'); return; }
+  if(c==='peach'){
+    if(L.peach){ SG.apply(G,{t:'peach'}); after(); }
+    else if(L.slash && SG.has(G.p[vi],'yonglie')){ SG.apply(G,{t:'slash'}); after(); }
+    else flash('体力已满，吃桃浪费了。');
+    return;
+  }
   if(c==='wzsy'){ if(L.wzsy){ SG.apply(G,{t:'wzsy'}); after(); } return; }
 }
 
@@ -1017,8 +1223,14 @@ function renderActs(){
   if(a && a.p === 1 && mode === 'ai'){ box.innerHTML = '<span style="font-size:13px;color:#8a857a;">电脑思考中…</span>'; return; }
 
   if(a && a.type==='yusuan'){
-    box.innerHTML = '<button class="pri" onclick="act({t:\'yusuan\',use:true})">发动【羽算】：摸 3 张留 2 张</button>' +
+    box.innerHTML = '<button class="pri" onclick="act({t:\'yusuan\',use:true})">发动【羽算】：额外摸 3 张，再弃 1 张</button>' +
                     '<button onclick="act({t:\'yusuan\',use:false})">正常摸 2 张</button>';
+    return;
+  }
+  if(a && a.type==='trim'){
+    box.innerHTML = '<span style="font-size:13px;">【羽算】牌摸得够多，挑 ' + a.n + ' 张弃掉：</span>' +
+      '<button class="pri"' + (sel.length===a.n?'':' disabled') + ' onclick="act({t:\'trim\',idxs:sel})">确定弃掉</button>';
+    tip.textContent = '点手牌选中要弃的 ' + a.n + ' 张，再点确定。'; tip.style.display='block';
     return;
   }
   if(a && a.type==='keep'){
@@ -1052,7 +1264,7 @@ function renderActs(){
   }
   if(a && a.type==='dodge'){
     box.innerHTML = '<span style="font-size:13px;">被【杀】了，伤害 ' + a.dmg + ' 点。' +
-      (a.noDodge ? '<b style="color:#B03A2E;">【武圣】此杀无法闪避！</b>' : '') +
+      (a.note ? '<b style="color:#B03A2E;">' + a.note + '</b>' : '') +
       (a.need > 1 ? '<b style="color:#B03A2E;">【无双】需要出两张闪！</b>' : '') + '</span>' +
       (a.canDodge ? '<button class="pri" onclick="act({t:\'dodge\',use:true})">出【闪】</button>' +
         '<button onclick="act({t:\'dodge\',use:false})">硬吃这一下</button>'

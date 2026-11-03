@@ -90,125 +90,125 @@ const CARDS = [
   {
     name:"小将军 ·（写下你的名字）", power:9, faction:"shu", hp:4, art:"art/hero.png",
     skills:[
-      { name:"锐气", text:"出牌阶段限一次，你可以弃置一张牌，然后摸两张牌。" },
-      { name:"少年志", locked:true, text:"锁定技，你的手牌上限 +1，且你出牌阶段可使用【杀】的次数 +1。" }
+      { name:"锐气", text:"出牌阶段限一次，你可以弃置一张手牌，然后摸两张牌。" },
+      { name:"少年志", locked:true, text:"你的手牌上限按体力上限计算，不因受伤而降低。" }
     ],
     quote:"且看我一枪定乾坤！"
   },
   {
     name:"白羽先生", power:7, faction:"wei", hp:3, art:"art/strategist.png",
     skills:[
-      { name:"羽算", text:"摸牌阶段开始时，你可以放弃摸牌，改为摸三张牌，然后保留其中两张。" },
-      { name:"静澜", text:"每回合限一次，当你成为【杀】的目标后，你可以展示一张手牌，若为基本牌，此【杀】对你无效。" }
+      { name:"羽算", text:"摸牌阶段，你可以额外摸三张牌、弃置一张手牌，且本回合可多使用一张【杀】。" },
+      { name:"静澜", text:"每回合限一次，当你成为【杀】的目标时，你可以弃置一张手牌，令此【杀】无效，然后摸一张牌。" }
     ],
     quote:"运筹帷幄之中，胜负已分。"
   },
   {
     name:"青鸾", power:6, faction:"wu", hp:3, art:"art/archer.png",
     skills:[
-      { name:"穿杨", locked:true, text:"当你使用【杀】造成伤害后，你摸一张牌。" },
-      { name:"惊鸿", text:"当你使用【闪】抵消【杀】后，你可以对使用者造成 1 点伤害。" }
+      { name:"穿杨", locked:true, text:"当你的【杀】造成伤害后，你摸一张牌。" },
+      { name:"惊鸿", text:"当你使用【闪】抵消【杀】后，你可以对使用者造成 1 点伤害，然后摸一张牌。" }
     ],
     quote:"箭未离弦，心已中靶。"
   },
   {
-    name:"虎痴·关山", power:8, faction:"qun", hp:4, art:"art/general.png",
+    name:"虎痴·关山", power:8, faction:"qun", hp:5, art:"art/general.png",
     skills:[
-      { name:"猛力", text:"出牌阶段，你使用的第一张【杀】伤害 +1。" },
-      { name:"斗志", text:"当你每受到 1 点伤害后，你可以摸一张牌。" }
+      { name:"猛力", locked:true, text:"当你已受伤时，你的【杀】伤害 +1。" },
+      { name:"斗志", locked:true, text:"当你受到伤害后，你摸两张牌；若你的体力值不多于 2，改为摸三张牌。" }
     ],
     quote:"谁敢与我一战！"
   },
   {
-    name:"神姜维", power:13, faction:"shen", hp:4, art:"art/jiangwei.png",
+    name:"吕布", power:9, faction:"qun", hp:4, art:"art/jiangwei.png",
     skills:[
-      { name:"九伐", text:"出牌阶段，你使用【杀】的次数上限为 3。" },
-      { name:"继志", locked:true, text:"锁定技，你的手牌上限 +1。" },
-      { name:"胆烈", text:"每局游戏限一次，当你的体力值变为 1 时，你摸三张牌。" }
+      { name:"无双", locked:true, text:"你使用【杀】时，对方需两张【闪】才能抵消；未能抵消则受到 2 点伤害。" },
+      { name:"虓虎", locked:true, text:"当你的【杀】被【闪】抵消后，你弃置对方一张手牌。" }
     ],
     quote:"丞相之志，维不敢忘。"
   },
   {
-    name:"吕布", power:9, faction:"qun", hp:4, art:"art/lvbu.png",
+    name:"赵云", power:8, faction:"shu", hp:4, art:"art/lvbu.png",
     skills:[
-      { name:"无双", locked:true, text:"锁定技，你使用的【杀】需两张【闪】才能抵消。" },
-      { name:"虓虎", locked:true, text:"锁定技，你每回合使用的第一张【杀】伤害 +1。" }
+      { name:"龙胆", locked:true, text:"你可以将【杀】当【闪】、【闪】当【杀】使用。" },
+      { name:"涯角", locked:true, text:"你以此法转换使用牌后摸一张牌（每回合限两次）。" }
     ],
     quote:"人中吕布，马中赤兔！"
   },
   {
-    name:"赵云", power:8, faction:"shu", hp:4, art:"art/zhaoyun.png",
+    name:"诸葛亮", power:7, faction:"shu", hp:4, art:"art/zhaoyun.png",
     skills:[
-      { name:"龙胆", locked:true, text:"锁定技，你可以将【杀】当作【闪】、【闪】当作【杀】使用。" },
-      { name:"涯角", locked:true, text:"锁定技，你的手牌上限 +1。" }
+      { name:"空城", locked:true, text:"当你使用【杀】时若手牌不多于一张，此【杀】伤害 +1；当你受到伤害后，你摸一张牌。" },
+      { name:"借箭", text:"出牌阶段限一次，你可以弃置一张手牌，视为使用一张【杀】（不计入本回合出【杀】次数，且不可被【闪】抵消）。" }
     ],
     quote:"七进七出，有何惧哉！"
   },
   {
-    name:"诸葛亮", power:7, faction:"shu", hp:3, art:"art/zhugeliang.png",
+    name:"貂蝉", power:6, faction:"qun", hp:4, art:"art/zhugeliang.png",
     skills:[
-      { name:"空城", locked:true, text:"锁定技，当你没有手牌时，你不能成为【杀】的目标。" },
-      { name:"观星", locked:true, text:"锁定技，你的摸牌阶段多摸一张牌，且手牌上限 +1。" }
+      { name:"离间", text:"出牌阶段限一次，你可以弃置一张手牌，令对方弃置两张手牌。" },
+      { name:"闭月", text:"每回合限一次，当你造成伤害后，你回复 1 点体力。" }
     ],
     quote:"鞠躬尽瘁，死而后已。"
   },
   {
-    name:"貂蝉", power:6, faction:"qun", hp:3, art:"art/diaochan.png",
+    name:"关羽", power:9, faction:"shu", hp:4, art:"art/diaochan.png",
     skills:[
-      { name:"离间", text:"出牌阶段限一次，你可以弃置一张手牌，令对方弃置两张手牌。" },
-      { name:"闭月", locked:true, text:"锁定技，你的摸牌阶段多摸一张牌。" }
+      { name:"武圣", locked:true, text:"每回合你使用的第一张【杀】不可被【闪】抵消。" },
+      { name:"义释", locked:true, text:"你使用【桃】不受每回合一次的限制，且使用【桃】后摸一张牌、本回合可多使用一张【杀】。" }
     ],
     quote:"愿君怜取，且解君忧。"
   },
   {
-    name:"关羽", power:9, faction:"shu", hp:4, art:"art/guanyu.png",
+    name:"张飞", power:10, faction:"shu", hp:4, art:"art/guanyu.png",
     skills:[
-      { name:"武圣", locked:true, text:"锁定技，每回合限一次，你使用的第一张【杀】不可被【闪】抵消，且伤害 +1。" },
-      { name:"义释", locked:true, text:"锁定技，你的手牌上限 +1。" }
+      { name:"咆哮", locked:true, text:"你出牌阶段可使用【杀】的次数 +1（共 2 次）。" },
+      { name:"暴喝", locked:true, text:"当你的【杀】造成伤害后，对方弃置一张手牌。" }
     ],
     quote:"吾观尔等，如插标卖首耳。"
   },
   {
-    name:"张飞", power:10, faction:"shu", hp:4, art:"art/zhangfei.png",
+    name:"马超", power:10, faction:"shu", hp:4, art:"art/zhangfei.png",
     skills:[
-      { name:"咆哮", locked:true, text:"锁定技，你出牌阶段可使用【杀】的次数 +1。" },
-      { name:"暴喝", locked:true, text:"锁定技，当你的【杀】造成伤害后，对方弃置一张手牌。" }
+      { name:"铁骑", locked:true, text:"你使用【杀】造成的伤害 +1。" },
+      { name:"西凉", locked:true, text:"每回合限一次，当你的【杀】被【闪】抵消后，你摸一张牌，且本回合可再使用一张【杀】。" }
     ],
     quote:"燕人张翼德在此，谁敢决一死战！"
   },
   {
-    name:"马超", power:10, faction:"shu", hp:4, art:"art/machao.png",
+    name:"神姜维", power:13, faction:"shen", hp:4, art:"art/machao.png",
     skills:[
-      { name:"铁骑", locked:true, text:"锁定技，你使用【杀】造成的伤害 +1。" },
-      { name:"西凉", locked:true, text:"锁定技，你的摸牌阶段多摸一张牌。" }
+      { name:"九伐", locked:true, text:"你出牌阶段可使用【杀】的次数上限为 3。" },
+      { name:"继志", text:"每局限一次，当你进入濒死状态时，无需【桃】即可回到 1 点体力。" },
+      { name:"胆烈", text:"每局限一次，当你的体力值变为 1 时，你摸两张牌。" }
     ],
     quote:"西凉铁骑，踏破中原！"
   },
   {
     name:"势魏延", power:12, faction:"shi", hp:4, art:"art/weiyan.png",
     skills:[
-      { name:"奇谋", text:"出牌阶段限一次，你可以弃置一张手牌，对对方造成 1 点伤害（不可被【闪】响应）。" },
-      { name:"勇烈", locked:true, text:"锁定技，你每回合使用的第一张【杀】伤害 +1。" }
+      { name:"奇谋", text:"出牌阶段限一次，你可以弃置一张手牌，对对方造成 1 点伤害，然后摸一张牌。" },
+      { name:"勇烈", locked:true, text:"你可以将【桃】当【杀】使用。" }
     ],
     quote:"谁敢杀我！"
   },
   {
-    name:"势周瑜", power:11, faction:"shi", hp:4, art:"art/zhouyu.png",
+    name:"势周瑜", power:11, faction:"shi", hp:3, art:"art/zhouyu.png",
     skills:[
-      { name:"业火", text:"出牌阶段限一次，你可以弃置两张手牌，对对方造成 2 点伤害（不可被【闪】响应）。" },
-      { name:"顾曲", locked:true, text:"锁定技，你的摸牌阶段多摸一张牌。" }
+      { name:"业火", text:"出牌阶段限一次，你可以弃置两张手牌，对对方造成 2 点伤害。" },
+      { name:"顾曲", locked:true, text:"你发动【业火】后摸一张牌。" }
     ],
     quote:"谈笑间，樯橹灰飞烟灭。"
   },
   {
     name:"势邓艾", power:11, faction:"shi", hp:4, art:"art/dengai.png",
     skills:[
-      { name:"凿险", locked:true, text:"锁定技，当你使用【杀】造成伤害后，你本回合使用【杀】的次数上限 +1。" },
-      { name:"阴平", locked:true, text:"锁定技，你的手牌上限 +1。" }
+      { name:"凿险", locked:true, text:"每回合限一次，当你的【杀】造成伤害后，本回合你使用【杀】的次数 +1。" },
+      { name:"阴平", locked:true, text:"你本回合使用的第二张及之后的【杀】不可被【闪】抵消，且伤害 +1。" }
     ],
     quote:"间道险行，直取成都。"
   }
-];
+];;
 
 const SUIT = { wei:["♠","#3B332A"], shu:["♥","#B03A2E"], wu:["♣","#3B332A"],
              qun:["♦","#B03A2E"], shen:["★","#6D4C9F"], shi:["◆","#C86A27"] };
