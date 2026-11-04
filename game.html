@@ -212,7 +212,7 @@ var SG = (function(){
               {id:'shaonianzhi',name:'少年志',kind:'locked',desc:'锁定技，你的手牌上限按体力上限计算，不因受伤而降低。'}] },
     { id:'baiyu', name:'白羽先生', faction:'wei', hp:3, power:7, handBonus:0, slashLimit:1,
       skills:[{id:'yusuan',name:'羽算',kind:'active',desc:'摸牌阶段，你可以额外摸三张牌、弃置一张手牌，且本回合可多使用一张【杀】。'},
-              {id:'jinglan',name:'静澜',kind:'trigger',desc:'每回合限一次，当你成为【杀】的目标时，你可以弃置一张手牌，令此【杀】无效，然后摸一张牌。'}] },
+              {id:'jinglan',name:'静澜',kind:'trigger',desc:'每回合限一次，当你成为【杀】的目标时，你可以弃置一张手牌，令此【杀】无效（包括不可被【闪】抵消的杀），然后摸一张牌。'}] },
     { id:'qingluan', name:'青鸾', faction:'wu', hp:3, power:6, handBonus:0, slashLimit:1,
       skills:[{id:'chuanyang',name:'穿杨',kind:'locked',desc:'锁定技，当你的【杀】造成伤害后，你摸一张牌。'},
               {id:'jinghong',name:'惊鸿',kind:'trigger',desc:'当你使用【闪】抵消【杀】后，你可以对使用者造成 1 点伤害，然后摸一张牌。'}] },
@@ -336,6 +336,7 @@ var SG = (function(){
     var p = st.turn;
     st.slashUsed = 0;
     st.slashBonus = 0;
+    st.slashFree = 0;
     st.p[p].used = st.p[p].used || {};
     st.p[p].used.ruiqi = false;
     st.p[p].used.jinglan = false;
@@ -410,10 +411,6 @@ var SG = (function(){
                 st.slashUsed < st.p[p].hero.slashLimit + (st.slashBonus || 0) && !oppBlocked;
     out.lijian = has(st.p[p],'lijian') && !st.p[p].used.lijian && h.length > 0 && st.p[opp].hand.length > 0;
     /* 义释：关羽吃桃不限次数 */
-    /* 义释：用过【桃】之后，本回合还能再补一刀 */
-    if(has(st.p[p],'yishi') && st.p[p].used.peach && !st.p[p].used.yishiBonus){
-      st.p[p].used.yishiBonus = true; st.slashBonus = (st.slashBonus || 0) + 1;
-    }
     out.peach = h.indexOf('peach') >= 0 && st.p[p].hp < st.p[p].maxHp &&
                 (has(st.p[p],'yishi') || !st.p[p].used.peach);
     out.wzsy = h.indexOf('wzsy') >= 0;
@@ -729,7 +726,14 @@ var SG = (function(){
     say(st, st.p[p].name + ' 使用【桃】，回复 1 点体力。', p);
     if(has(st.p[p],'yishi')){
       draw(st, p, 1);
-      say(st, st.p[p].name + ' 【义释】以德服人，摸 1 张牌。', p);
+      /* 义释：吃完桃还能再补一刀 */
+      if(!st.p[p].used.yishiBonus){
+        st.p[p].used.yishiBonus = true;
+        st.slashBonus = (st.slashBonus || 0) + 1;
+        say(st, st.p[p].name + ' 【义释】以德服人，摸 1 张牌，本回合可再出一刀。', p);
+      } else {
+        say(st, st.p[p].name + ' 【义释】以德服人，摸 1 张牌。', p);
+      }
     }
   }
 
@@ -1295,6 +1299,7 @@ function renderActs(){
     (L.yehuo ? '<button onclick="act({t:\'yehuo\'})">【业火】弃2张→2点必中伤害</button>' : '') +
     (L.ruiqi ? '<button onclick="ruiqi()">【锐气】弃1摸2</button>' : '') +
     (L.lijian ? '<button onclick="act({t:\'lijian\'})">【离间】弃1张→逼对方弃2张</button>' : '') +
+    (L.zhijian ? '<button onclick="act({t:\'zhijian\'})">【借箭】弃1张→出杀，不占次数且不可闪</button>' : '') +
     '<button onclick="act({t:\'end\'})">结束回合</button>';
 }
 
