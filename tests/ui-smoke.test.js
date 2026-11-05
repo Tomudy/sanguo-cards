@@ -23,7 +23,7 @@ const store = {};
 const sandbox = {
   console,
   module: { exports: {} },
-  document: { getElementById: id => (store[id] = store[id] || makeEl()) },
+  document: { getElementById: id => (store[id] = store[id] || makeEl()), addEventListener() {} },
   window: { AudioContext: function () { throw new Error('no audio in test'); } },
   setTimeout: () => 0,
   clearTimeout: () => {},

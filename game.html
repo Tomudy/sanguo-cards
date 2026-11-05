@@ -1352,9 +1352,27 @@ function ac(){
       AC = new Ctor();
       MASTER = AC.createGain(); MASTER.gain.value = 0.55; MASTER.connect(AC.destination);
     }
+    /* 惯例之外创建的上下文常处于 suspended，能恢复就恢复（手势外恢复会被浏览器忽略，无害） */
+    if(AC.state === 'suspended' && AC.resume){
+      try{ AC.resume(); }catch(e){}
+    }
     return AC;
   }catch(e){ return null; }
 }
+/* 移动端解锁：iOS / 安卓浏览器要求 AudioContext 在用户手势内创建或恢复，
+   否则永远静音。首次触摸/点击/按键时解锁一次（用户选武将的第一下就够）。 */
+function unlockAudio(){
+  var c = ac();
+  if(c && c.state === 'suspended' && c.resume){
+    try{ c.resume(); }catch(e){}
+  }
+}
+(function(){
+  var evs = ['touchstart', 'mousedown', 'click', 'keydown'];
+  for(var i = 0; i < evs.length; i++){
+    document.addEventListener(evs[i], unlockAudio, { once: true, passive: true });
+  }
+})();
 function tone(o){
   var c = ac(); if(!c || muted) return;
   try{
