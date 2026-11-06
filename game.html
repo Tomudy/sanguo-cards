@@ -74,6 +74,30 @@ button:disabled{opacity:.4;cursor:not-allowed;}
   pointer-events:none;}
 .float.go{animation:fly 1s ease-out;}
 @keyframes fly{0%{opacity:1;transform:translateY(0);}100%{opacity:0;transform:translateY(-26px);}}
+/* 暴击飘字：更大更重 */
+.float.crit{font-size:30px;color:#B03A2E;text-shadow:0 1px 0 #fff,0 0 8px rgba(176,58,46,.35);}
+
+/* ===== 打击感：受伤震屏 ===== */
+@keyframes shake{0%,100%{transform:translateX(0);}
+  20%{transform:translateX(-6px);}40%{transform:translateX(5px);}
+  60%{transform:translateX(-4px);}80%{transform:translateX(3px);}}
+@keyframes shakeHard{0%,100%{transform:translate(0,0);}
+  15%{transform:translate(-9px,2px);}30%{transform:translate(8px,-2px);}
+  45%{transform:translate(-7px,1px);}60%{transform:translate(6px,2px);}
+  75%{transform:translate(-4px,-1px);}90%{transform:translate(3px,0);}}
+.side.shake{animation:shake .32s;}
+.side.shakeHard{animation:shakeHard .45s;}
+
+/* ===== 打击感：出杀卡牌飞行 ===== */
+.flycard{position:fixed;left:0;top:0;z-index:99;width:52px;height:72px;border-radius:8px;
+  background:#fffdf6;border:2px solid #B03A2E;color:#B03A2E;font-size:22px;font-weight:700;
+  font-family:"KaiTi",serif;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 14px rgba(0,0,0,.28);pointer-events:none;opacity:1;
+  transition:transform .38s ease-in,opacity .38s ease-in;}
+
+/* 牌堆余量信息条 */
+.deckinfo{font-size:12px;color:#8a857a;text-align:center;margin:-4px 0 6px;}
+.deckinfo b{color:#6b665c;}
 
 .logwrap{background:#fff;border:1px solid var(--line);border-radius:12px;margin:10px 0;height:132px;
   overflow-y:auto;padding:8px 12px;font-size:12.5px;line-height:1.85;}
@@ -185,6 +209,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   <div class="board" id="board">
     <div class="side" id="sideTop"></div>
     <div class="logwrap" id="log"></div>
+    <div class="deckinfo" id="deckInfo"></div>
     <div class="side" id="sideBot"></div>
     <div class="myhand">
       <div id="handLabel" style="font-size:12px;color:#8a857a;margin-bottom:6px;">手牌</div>
@@ -1114,23 +1139,69 @@ function face(pid){
     '<div class="float" id="fl' + pid + '"></div>';
 }
 
+/* ===== 打击感辅助：震屏、飞牌、手机震动 ===== */
+function buzz(pat){
+  try{
+    if(typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(pat);
+  }catch(e){}
+}
+function shakeSide(pid, hard){
+  try{
+    var el = document.getElementById(pid === 0 ? 'sideBot' : 'sideTop');
+    if(!el) return;
+    el.classList.remove('shake'); el.classList.remove('shakeHard');
+    void el.offsetWidth;                                  /* 强制重排，让动画能重复触发 */
+    el.classList.add(hard ? 'shakeHard' : 'shake');
+  }catch(e){}
+}
+function flyCard(pid){
+  try{
+    if(!document.createElement || !document.body || !window.innerWidth) return;
+    var d = document.createElement('div');
+    d.className = 'flycard'; d.textContent = '杀';
+    document.body.appendChild(d);
+    var W = window.innerWidth, H = window.innerHeight;
+    var x0 = W / 2 - 26, y0 = pid === 0 ? H - 150 : 60;   /* 从出牌方手边起飞 */
+    var x1 = W / 2 - 26 + (pid === 0 ? 30 : -30), y1 = pid === 0 ? 70 : H - 240;
+    d.style.left = x0 + 'px'; d.style.top = y0 + 'px';
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){
+      d.style.transform = 'translate(' + (x1 - x0) + 'px,' + (y1 - y0) + 'px) rotate(' +
+        (pid === 0 ? -40 : 40) + 'deg)';
+      d.style.opacity = '0.1';
+    }); });
+    setTimeout(function(){ if(d.parentNode) d.parentNode.removeChild(d); }, 500);
+  }catch(e){}
+}
+
 function render(){
   if(!G) return;
   G.events.forEach(function(ev){
     if(ev.type === 'damage'){
       var el = document.getElementById('fl' + ev.p);
-      if(el){ el.textContent = '-' + ev.n; el.classList.remove('go'); void el.offsetWidth; el.classList.add('go'); }
+      if(el){
+        el.textContent = (ev.n >= 2 ? '重击 -' : '-') + ev.n;
+        el.classList.remove('go', 'crit'); void el.offsetWidth;
+        if(ev.n >= 2) el.classList.add('crit');
+        el.classList.add('go');
+      }
+      shakeSide(ev.p, ev.n >= 2);
+      if(ev.p === 0) buzz(ev.n >= 2 ? [70, 50, 70] : 45);  /* 自己受伤才震手机 */
       if(ev.n >= 2) SFX.big(); else SFX.hit();
     }
-    else if(ev.type === 'slash') SFX.slash();
+    else if(ev.type === 'slash'){ SFX.slash(); flyCard(ev.p); }
     else if(ev.type === 'dodge') SFX.dodge();
     else if(ev.type === 'heal') SFX.heal();
     else if(ev.type === 'draw') SFX.draw();
     else if(ev.type === 'skill') SFX.skill();
-    else if(ev.type === 'dying') SFX.dying();
+    else if(ev.type === 'dying'){ SFX.dying(); if(ev.p === 0) buzz([180, 80, 180]); }
     else if(ev.type === 'over'){ if(ev.w === 0) SFX.win(); else SFX.lose(); }
   });
   G.events = [];
+
+  /* 牌堆余量（联机模式服务器不下发牌堆，自动隐藏） */
+  var di = document.getElementById('deckInfo');
+  if(di) di.innerHTML = (G.deck && G.discard) ?
+    '牌堆 <b>' + G.deck.length + '</b> 张 · 弃牌堆 ' + G.discard.length + ' 张' : '';
 
   document.getElementById('sideTop').className = 'side' + (SG.active(G)===1?' act':'');
   document.getElementById('sideTop').innerHTML = face(1);
