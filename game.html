@@ -99,6 +99,22 @@ button:disabled{opacity:.4;cursor:not-allowed;}
 .deckinfo{font-size:12px;color:#8a857a;text-align:center;margin:-4px 0 6px;}
 .deckinfo b{color:#6b665c;}
 
+/* ===== 战绩本 + 成就徽章 ===== */
+.stsum{font-size:13px;color:#4a453a;margin:2px 0 10px;}
+#statsBody h3{font-size:13px;margin:12px 0 6px;text-align:left;color:#6b665c;}
+.strows{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 14px;text-align:left;}
+.strow{display:flex;gap:6px;font-size:12px;color:#4a453a;align-items:baseline;}
+.strow .stname{font-weight:700;}
+.strow .stpower{color:#8a857a;font-size:11px;}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
+.badge{border:1px solid #ddd6c6;border-radius:10px;padding:8px 10px;text-align:left;
+  opacity:.45;filter:grayscale(.9);}
+.badge.got{opacity:1;filter:none;border-color:#C9A227;background:#FBF6E8;}
+.badge .bicon{font-size:20px;margin-right:6px;}
+.badge b{font-size:13px;}
+.badge .bdesc{display:block;font-size:11px;color:#8a857a;margin-top:2px;}
+#ovAch{margin:-6px 0 12px;font-size:14px;color:#B7950B;font-weight:700;}
+
 .logwrap{background:#fff;border:1px solid var(--line);border-radius:12px;margin:10px 0;height:132px;
   overflow-y:auto;padding:8px 12px;font-size:12.5px;line-height:1.85;}
 .logwrap div{border-bottom:1px dashed #eee;padding:1px 0;}
@@ -203,6 +219,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
       <button onclick="setMode('ai')" id="btnAi">电脑</button>
       <button onclick="setMode('pvp')" id="btnPvp">爸爸/同学（同机轮流）</button>
       <button class="pri" onclick="startGame()">开始对战</button>
+      <button onclick="showStats()">🏆 战绩</button>
     </div>
   </div>
 
@@ -223,7 +240,14 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 
 <div class="ov" id="ov"><div class="ovbox">
   <h2 id="ovTitle"></h2><p id="ovText"></p>
+  <div id="ovAch"></div>
   <button class="pri" onclick="again()">再来一局</button>
+</div></div>
+
+<div class="ov" id="statsOv"><div class="ovbox" style="max-width:560px;max-height:82vh;overflow-y:auto;text-align:center;">
+  <h2>🏆 战绩与成就</h2>
+  <div id="statsBody"></div>
+  <button class="pri" onclick="closeStats()">关闭</button>
 </div></div>
 
 <script id="engine">
@@ -1105,6 +1129,7 @@ function startGame(){
   var foeId = foe[Math.floor(Math.random()*foe.length)].id;
   G = SG.newGame({ seed:(Math.random()*1e9)|0, p0:myHero, p1:foeId });
   sel = [];
+  recorded = false;
   document.getElementById('setup').style.display = 'none';
   document.getElementById('board').style.display = 'block';
   SFX.start();
@@ -1173,6 +1198,90 @@ function flyCard(pid){
   }catch(e){}
 }
 
+/* ===== 战绩本 + 成就（localStorage 本机留存，家庭换设备不带走） ===== */
+var SKEY = 'sg_stats_v1';
+function loadStats(){
+  try{
+    if(typeof localStorage === 'undefined') return null;
+    var s = JSON.parse(localStorage.getItem(SKEY) || 'null');
+    return (s && typeof s === 'object') ? s : {};
+  }catch(e){ return null; }
+}
+function saveStats(s){
+  try{ if(typeof localStorage !== 'undefined') localStorage.setItem(SKEY, JSON.stringify(s)); }catch(e){}
+}
+var ACHS = [
+  { id:'first_win', icon:'🚩', name:'旗开得胜', desc:'赢下第一场对战' },
+  { id:'streak3',   icon:'🔥', name:'三连胜',   desc:'连续赢 3 场' },
+  { id:'streak5',   icon:'⚡', name:'五连胜',   desc:'连续赢 5 场' },
+  { id:'comeback',  icon:'💪', name:'绝地反击', desc:'只剩 1 点体力时取胜' },
+  { id:'flawless',  icon:'✨', name:'毫发无损', desc:'满血取胜' },
+  { id:'david',     icon:'🎯', name:'以下克上', desc:'用战力点数低 3 点以上的武将取胜' },
+  { id:'collector', icon:'🏆', name:'武将收藏家', desc:'15 位武将各赢一场' }
+];
+var recorded = false;
+function recordResult(){
+  var s = loadStats();
+  if(!s || G.winner < 0){ recorded = true; return []; }   /* 平局不计入战绩 */
+  var win = (G.winner === 0), fresh = [];
+  s.games = (s.games || 0) + 1;
+  if(win){ s.wins = (s.wins || 0) + 1; s.streak = (s.streak || 0) + 1; s.best = Math.max(s.best || 0, s.streak); }
+  else{ s.streak = 0; }
+  s.heroes = s.heroes || {};
+  var r = s.heroes[myHero] = s.heroes[myHero] || { w:0, l:0 };
+  if(win) r.w++; else r.l++;
+  if(win){
+    var me = G.p[0], foe = G.p[1];
+    s.ach = s.ach || {};
+    var unlock = function(id){
+      if(!s.ach[id]){
+        s.ach[id] = 1;
+        for(var i = 0; i < ACHS.length; i++) if(ACHS[i].id === id) fresh.push(ACHS[i]);
+      }
+    };
+    unlock('first_win');
+    if(s.streak >= 3) unlock('streak3');
+    if(s.streak >= 5) unlock('streak5');
+    if(me.hp <= 1) unlock('comeback');
+    if(me.hp >= me.maxHp) unlock('flawless');
+    if(foe && foe.hero && (foe.hero.power - me.hero.power) >= 3) unlock('david');
+    var all = true;
+    for(var k = 0; k < SG.HEROES.length; k++){
+      var hr = s.heroes[SG.HEROES[k].id];
+      if(!hr || !hr.w){ all = false; break; }
+    }
+    if(all) unlock('collector');
+  }
+  saveStats(s);
+  recorded = true;
+  return fresh;
+}
+function showStats(){
+  var s = loadStats() || {};
+  var g = s.games || 0, w = s.wins || 0;
+  var rate = g ? Math.round(w * 100 / g) : 0;
+  var rows = SG.HEROES.map(function(h){
+    var r = (s.heroes || {})[h.id] || { w:0, l:0 };
+    var n = r.w + r.l;
+    return '<div class="strow"><span class="stname" style="color:' + FC[h.faction] + '">' + h.name + '</span>' +
+      '<span class="stpower">' + h.power + '点</span>' +
+      '<span>' + (n ? r.w + '胜' + r.l + '负' : '—') + '</span></div>';
+  }).join('');
+  var got = 0;
+  var badges = ACHS.map(function(a){
+    var ok = (s.ach || {})[a.id]; if(ok) got++;
+    return '<div class="badge' + (ok ? ' got' : '') + '"><span class="bicon">' + a.icon + '</span>' +
+      '<b>' + a.name + '</b><span class="bdesc">' + (ok ? '已解锁' : a.desc) + '</span></div>';
+  }).join('');
+  document.getElementById('statsBody').innerHTML =
+    '<p class="stsum">共 <b>' + g + '</b> 局 · 胜 <b>' + w + '</b>（' + rate + '%）· 当前连胜 <b>' +
+    (s.streak || 0) + '</b> · 最高连胜 <b>' + (s.best || 0) + '</b></p>' +
+    '<h3>武将战绩</h3><div class="strows">' + rows + '</div>' +
+    '<h3>成就徽章（' + got + '/' + ACHS.length + '）</h3><div class="badges">' + badges + '</div>';
+  document.getElementById('statsOv').className = 'ov on';
+}
+function closeStats(){ document.getElementById('statsOv').className = 'ov'; }
+
 function render(){
   if(!G) return;
   G.events.forEach(function(ev){
@@ -1219,8 +1328,12 @@ function render(){
   renderActs();
 
   if(G.over){
+    var fresh = recorded ? [] : recordResult();
     document.getElementById('ovTitle').textContent = G.winner===0?'胜利！':(G.winner<0?'平局':'再接再厉');
     document.getElementById('ovText').textContent = G.overReason;
+    var achEl = document.getElementById('ovAch');
+    if(achEl) achEl.innerHTML = fresh.length ?
+      '🎉 新成就：' + fresh.map(function(a){ return a.icon + ' ' + a.name; }).join('　') : '';
     document.getElementById('ov').className = 'ov on';
   }
 }
