@@ -218,6 +218,11 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
       <span style="font-size:13px;">对手：</span>
       <button onclick="setMode('ai')" id="btnAi">电脑</button>
       <button onclick="setMode('pvp')" id="btnPvp">爸爸/同学（同机轮流）</button>
+      <span id="diffRow" style="font-size:13px;">电脑强度：
+        <button onclick="setAiLv(0)" id="btnLv0">陪玩</button>
+        <button onclick="setAiLv(1)" id="btnLv1" class="pri">标准</button>
+        <button onclick="setAiLv(2)" id="btnLv2">高手</button>
+      </span>
       <button class="pri" onclick="startGame()">开始对战</button>
       <button onclick="showStats()">🏆 战绩</button>
     </div>
@@ -340,6 +345,8 @@ var SG = (function(){
       turn: 0, round: 1, winner: null, over: false, overReason: '',
       log: [], events: [], awaiting: null, selected: [],
       slashUsed: 0,
+      /* AI 难度：0 = 陪玩（会失误），1 = 标准（默认，行为与旧版完全一致），2 = 高手 */
+      aiLevel: (opts.aiLevel === 0 ? 0 : (opts.aiLevel === 2 ? 2 : 1)),
       p: [
         { idx:0, hero:h0, hp:h0.hp, maxHp:h0.hp, hand:[], used:{}, name:h0.name, dying:false },
         { idx:1, hero:h1, hp:h1.hp, maxHp:h1.hp, hand:[], used:{}, name:h1.name, dying:false }
@@ -936,10 +943,14 @@ var SG = (function(){
   /* --- AI --- */
   function aiStep(st){
     if(st.over) return null;
+    /* 难度档：0 陪玩（失误 AI）/ 1 标准（与旧版完全一致）/ 2 高手。
+       标准档不消耗任何随机数，保证种子行为与旧版逐局一致。 */
+    var lv = (st.aiLevel === 0 || st.aiLevel === 2) ? st.aiLevel : 1;
+    var lazy = (lv === 0) && (st.rnd() < 0.4);   /* 陪玩档：约四成回合"松懈" */
     var p = active(st);
     if(st.awaiting){
       var a = st.awaiting, h = st.p[p].hand;
-      if(a.type==='yusuan') return { t:'yusuan', use:true };
+      if(a.type==='yusuan') return { t:'yusuan', use: lv !== 0 };
       if(a.type==='keep'){
         var keep = [];
         var order = ['peach','dodge','slash','wzsy'];
@@ -961,15 +972,18 @@ var SG = (function(){
         return { t:'trim', idxs:dd };
       }
       if(a.type==='dying') return { t:'dying', use: h.indexOf('peach') >= 0 };
-      if(a.type==='save') return { t:'save', use:false };
-      if(a.type==='jinglan') return { t:'jinglan', use: true };
+      if(a.type==='save') return { t:'save', use: lv === 0 && st.rnd() < 0.5 };  /* 陪玩档心软，可能救你 */
+      if(a.type==='jinglan') return { t:'jinglan', use: !(lv === 0 && st.rnd() < 0.5) };
       if(a.type==='dodge'){
         var hasDodge = a.canDodge && (h.indexOf('dodge') >= 0 || (has(st.p[p],'longdan') && h.indexOf('slash') >= 0));
         var worth = a.dmg + (has(st.p[p],'jinghong') ? 1 : 0);   /* 惊鸿：闪完还能反打一点 */
-        var use = hasDodge && (st.p[p].hp <= a.dmg || st.p[p].hp <= 2 || worth >= 2);
+        var use;
+        if(lv === 0) use = hasDodge && st.p[p].hp <= a.dmg;                       /* 陪玩：只挡致命的 */
+        else if(lv === 2) use = hasDodge && (st.p[p].hp <= a.dmg || st.p[p].hp <= 2 || worth >= 1);
+        else use = hasDodge && (st.p[p].hp <= a.dmg || st.p[p].hp <= 2 || worth >= 2);
         return { t:'dodge', use:use };
       }
-      if(a.type==='jinghong') return { t:'jinghong', use:true };
+      if(a.type==='jinghong') return { t:'jinghong', use: !(lv === 0 && st.rnd() < 0.5) };
       if(a.type==='discard'){
         var drop = [], prio = { wzsy:0, slash:2, dodge:4, peach:6 };
         var arr = [];
@@ -980,7 +994,21 @@ var SG = (function(){
       }
     }
     var L = legal(st), hh = st.p[p].hand;
-    if(L.peach && st.p[p].hp <= 1) return { t:'peach' };
+    if(lazy){
+      /* 陪玩档的松懈回合：最多砍一刀、血量见底才吃桃，技能全跳过 */
+      if(L.peach && st.p[p].hp <= 1) return { t:'peach' };
+      if(L.slash) return { t:'slash' };
+      return { t:'end' };
+    }
+    if(lv === 2){
+      /* 高手档：先算斩杀线——直伤够收人头就不赌出杀 */
+      var foe = st.p[1-p];
+      if(L.yehuo && foe.hp <= 2 && hh.length >= 3) return { t:'yehuo' };
+      if(L.qimou && foe.hp <= 1 && hh.length >= 2) return { t:'qimou' };
+      if(L.lijian && hh.length >= 3 && foe.hand.length >= 2) return { t:'lijian' };
+      if(L.wzsy && hh.length <= 2) return { t:'wzsy' };   /* 空手先补牌再打 */
+    }
+    if(L.peach && st.p[p].hp <= (lv === 2 ? 2 : 1)) return { t:'peach' };
     if(L.yehuo && hh.length >= 3) return { t:'yehuo' };
     if(L.lijian && hh.length >= 3) return { t:'lijian' };
     /* 魏延：只有桃没杀时才拿桃当杀，且血少时不烧桃 */
@@ -1089,6 +1117,27 @@ var DESC = { slash:'攻击对手，对方不出闪则掉血', dodge:'抵消一�
 var KINDS = { locked:'锁定', trigger:'触发', active:'主动' };
 
 var myHero = 'boy', mode = 'ai', G = null, sel = [], muted = false, busy = false;
+/* AI 难度档：0 陪玩 / 1 标准 / 2 高手（记忆在上次选择） */
+var AINAMES = { 0:'陪玩', 1:'标准', 2:'高手' };
+var aiLv = 1;
+try{
+  if(typeof localStorage !== 'undefined'){
+    var _v = parseInt(localStorage.getItem('sg_ai_v1'), 10);
+    if(_v === 0 || _v === 2) aiLv = _v;
+  }
+}catch(e){}
+function setAiLv(v){
+  aiLv = v;
+  try{ if(typeof localStorage !== 'undefined') localStorage.setItem('sg_ai_v1', String(v)); }catch(e){}
+  for(var k = 0; k <= 2; k++){
+    var b = document.getElementById('btnLv' + k);
+    if(b) b.className = (k === v ? 'pri' : '');
+  }
+}
+function setMode(m){ mode = m; document.getElementById('btnAi').className = (m==='ai'?'pri':'');
+  document.getElementById('btnPvp').className = (m==='pvp'?'pri':'');
+  var dr = document.getElementById('diffRow');
+  if(dr) dr.style.display = (m === 'ai' ? '' : 'none'); }
 
 var HINT = {
   boy:'两刀在手，弃 1 摸 2 换资源，受伤也不缩手牌上限（新手首选）',
@@ -1122,12 +1171,10 @@ function renderPicks(){
   }).join('');
 }
 function pick(id){ myHero = id; SFX.click(); renderPicks(); }
-function setMode(m){ mode = m; document.getElementById('btnAi').className = (m==='ai'?'pri':'');
-  document.getElementById('btnPvp').className = (m==='pvp'?'pri':''); }
 function startGame(){
   var foe = SG.HEROES.filter(function(h){ return h.id !== myHero; });
   var foeId = foe[Math.floor(Math.random()*foe.length)].id;
-  G = SG.newGame({ seed:(Math.random()*1e9)|0, p0:myHero, p1:foeId });
+  G = SG.newGame({ seed:(Math.random()*1e9)|0, p0:myHero, p1:foeId, aiLevel: aiLv });
   sel = [];
   recorded = false;
   document.getElementById('setup').style.display = 'none';
@@ -1150,7 +1197,7 @@ function face(pid){
   var stc = st.c==='red' ? '#B03A2E' : (st.c==='black' ? '#3B332A' : (st.c==='shen' ? '#6D4C9F' : '#C86A27'));
   return '<img class="face" src="' + ART[pl.hero.id] + '" alt="">' +
     '<div class="info"><div class="iname" style="color:' + FC[pl.hero.faction] + '">' + pl.name +
-    (pid===0?'（你）':'（' + (mode==='ai'?'电脑':'对手') + '）') +
+    (pid===0?'（你）':'（' + (mode==='ai' ? '电脑·' + AINAMES[aiLv] : '对手') + '）') +
     (pl.dying ? '<span style="color:#B03A2E;font-size:12px;"> ⚠️ 濒死求桃</span>' : '') + '</div>' +
     '<div class="imeta">' + FCN[pl.hero.faction] + ' · <b style="color:' + stc + '">' +
       st.s + ' 战力 ' + pl.hero.power + '</b> · ' + pl.hero.skills.map(function(s){return '【'+s.name+'】';}).join('') + '</div>' +
@@ -1622,6 +1669,7 @@ function toggleBgm(){
 
 renderPicks();
 setMode('ai');
+setAiLv(aiLv);   /* 恢复上次选的电脑强度 */
 </script>
 </body>
 </html>
