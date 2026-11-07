@@ -272,8 +272,8 @@ var SG = (function(){
       skills:[{id:'chuanyang',name:'穿杨',kind:'locked',desc:'锁定技，当你的【杀】造成伤害后，你摸一张牌。'},
               {id:'jinghong',name:'惊鸿',kind:'trigger',desc:'当你使用【闪】抵消【杀】后，你可以对使用者造成 1 点伤害，然后摸一张牌。'}] },
     { id:'gushan', name:'虎痴·关山', faction:'qun', hp:5, power:8, handBonus:0, slashLimit:1,
-      skills:[{id:'mengli',name:'猛力',kind:'locked',desc:'锁定技，当你已受伤时，你的【杀】伤害 +1。'},
-              {id:'douzhi',name:'斗志',kind:'locked',desc:'锁定技，当你受到伤害后，你摸两张牌；若你的体力值不多于 2，改为摸三张牌。'}] },
+      skills:[{id:'mengli',name:'猛力',kind:'locked',desc:'锁定技，每回合限一次，当你已受伤时，你的【杀】伤害 +1。'},
+              {id:'douzhi',name:'斗志',kind:'locked',desc:'锁定技，当你受到伤害后，你摸两张牌。'}] },
     { id:'lvbu', name:'吕布', faction:'qun', hp:4, power:9, handBonus:0, slashLimit:1,
       skills:[{id:'wushuang',name:'无双',kind:'locked',desc:'锁定技，你使用【杀】时，对方需两张【闪】才能抵消；未能抵消则受到 2 点伤害。'},
               {id:'xiaohu',name:'虓虎',kind:'locked',desc:'锁定技，当你的【杀】被【闪】抵消后，你弃置对方一张手牌。'}] },
@@ -346,7 +346,7 @@ var SG = (function(){
       rnd: rnd, deck: shuffle(buildDeck(), rnd), discard: [],
       turn: 0, round: 1, winner: null, over: false, overReason: '',
       log: [], events: [], awaiting: null, selected: [],
-      slashUsed: 0, nuBoost: 0,
+      slashUsed: 0, nuActive: false,
       /* AI 难度：0 = 陪玩（会失误），1 = 标准（默认，行为与旧版完全一致），2 = 高手 */
       aiLevel: (opts.aiLevel === 0 ? 0 : (opts.aiLevel === 2 ? 2 : 1)),
       p: [
@@ -394,7 +394,7 @@ var SG = (function(){
     var p = st.turn;
     st.slashUsed = 0;
     st.slashBonus = 0;
-    st.nuBoost = 0;           /* 连弩加成只持续本回合 */
+    st.nuActive = false;      /* 连弩只持续本回合 */
     st.p[p].used = st.p[p].used || {};
     st.p[p].used.ruiqi = false;
     st.p[p].used.jinglan = false;
@@ -408,6 +408,7 @@ var SG = (function(){
     st.p[p].used.biyue = false;
     st.p[p].used.xiliang = false;
     st.p[p].used.zaoxian = false;
+    st.p[p].used.mengli = false;
     st.p[p].used.kongcheng = false;
     st.p[p].used.yajiao = 0;
     st.p[p].used.yishiBonus = false;
@@ -465,14 +466,15 @@ var SG = (function(){
     var canSlashCard = h.indexOf('slash') >= 0 ||
       (has(st.p[p],'longdan') && h.indexOf('dodge') >= 0) ||
       (has(st.p[p],'yonglie') && h.indexOf('peach') >= 0);
-    out.slash = canSlashCard &&
-                st.slashUsed < st.p[p].hero.slashLimit + (st.slashBonus || 0) && !oppBlocked;
+    /* 连弩：本回合出【杀】不再受次数限制 */
+    var lim = st.nuActive ? 99 : st.p[p].hero.slashLimit + (st.slashBonus || 0);
+    out.slash = canSlashCard && st.slashUsed < lim && !oppBlocked;
     out.lijian = has(st.p[p],'lijian') && !st.p[p].used.lijian && h.length > 0 && st.p[opp].hand.length > 0;
     /* 义释：关羽吃桃不限次数 */
     out.peach = h.indexOf('peach') >= 0 && st.p[p].hp < st.p[p].maxHp &&
                 (has(st.p[p],'yishi') || !st.p[p].used.peach);
     out.wzsy = h.indexOf('wzsy') >= 0;
-    out.nu = h.indexOf('nu') >= 0 && !st.nuBoost;    /* 加成还没用掉就别浪费第二张 */
+    out.nu = h.indexOf('nu') >= 0 && !st.nuActive;   /* 已经架起来了就别浪费第二张 */
     out.ruiqi = has(st.p[p], 'ruiqi') && !st.p[p].used.ruiqi && h.length > 0;
     out.qimou = has(st.p[p], 'qimou') && !st.p[p].used.qimou && h.length > 0;
     out.yehuo = has(st.p[p], 'yehuo') && !st.p[p].used.yehuo && h.length >= 2;
@@ -526,15 +528,12 @@ var SG = (function(){
 
     var dmg = 1;
     if(has(st.p[p],'tieji')) dmg += 1;                                   /* 马超：恒定加重 */
-    if(has(st.p[p],'mengli') && st.p[p].hp < st.p[p].maxHp) dmg += 1;    /* 关山：带伤更狠 */
+    if(has(st.p[p],'mengli') && st.p[p].hp < st.p[p].maxHp && !st.p[p].used.mengli){
+      st.p[p].used.mengli = true; dmg += 1;                              /* 关山：每回合第一刀更狠 */
+    }
     if(has(st.p[p],'kongcheng') && st.p[p].hand.length <= 1){
       dmg += 1;                                                         /* 诸葛亮：空手出刀更重 */
       say(st, st.p[p].name + ' 手中几乎无牌，【空城】反倒成了杀招，伤害 +1！', p);
-    }
-
-    if(st.nuBoost){
-      st.nuBoost = 0; dmg += 1;
-      say(st, st.p[p].name + ' 的连弩连发两箭，一箭未落一箭又至，伤害 +1！', p);
     }
 
     /* 三种"闪不掉"，触发条件各不相同 */
@@ -693,10 +692,8 @@ var SG = (function(){
     st.events.push({ type:'damage', p:t, n:n });
     say(st, st.p[t].name + ' 失去 ' + n + ' 点体力（剩余 ' + Math.max(0,st.p[t].hp) + '）。', t);
     if(has(st.p[t],'douzhi')){
-      /* 斗志：越到残血越凶，摸牌数随伤势加重 */
-      var dn = st.p[t].hp <= 2 ? 3 : 2;
-      draw(st, t, dn);
-      say(st, st.p[t].name + ' 发动【斗志】，挨打更来劲，摸 ' + dn + ' 张牌。', t);
+      draw(st, t, 2);
+      say(st, st.p[t].name + ' 发动【斗志】，挨打更来劲，摸 2 张牌。', t);
     }
     /* 【空城】：空手时挨打反而清醒，摸一张牌 */
     if(has(st.p[t],'kongcheng') && st.p[t].hand.length <= 1){
@@ -810,14 +807,14 @@ var SG = (function(){
     say(st, st.p[p].name + ' 使用【无中生有】，摸 2 张牌。', p);
   }
 
-  /* 诸葛连弩：一次性道具，架起后下一张【杀】两箭齐发，伤害 +1（不占装备区） */
+  /* 诸葛连弩：一次性道具，架起后本回合出【杀】不限次数（不占装备区） */
   function doNu(st){
     var p = st.turn, i = st.p[p].hand.indexOf('nu');
     if(i < 0) return;
     discardCard(st, p, i);
-    st.nuBoost = 1;
+    st.nuActive = true;
     st.events.push({ type:'card', p:p, name:'诸葛连弩' });
-    say(st, st.p[p].name + ' 架起【诸葛连弩】，箭槽上满，下一张【杀】连发两箭！', p);
+    say(st, st.p[p].name + ' 架起【诸葛连弩】，箭槽上满，本回合出【杀】不再受次数限制！', p);
   }
 
   function doRuiqi(st, idx){
@@ -1034,8 +1031,8 @@ var SG = (function(){
     if(L.slash && !realSlash && hh.indexOf('peach') >= 0 && st.p[p].hp <= 2) L.slash = false;
     /* 诸葛亮：手牌少时先借箭，弃到空手正好触发【空城】加重 */
     if(L.zhijian && (hh.length <= 2 || hh.indexOf('slash') < 0)) return { t:'zhijian' };
-    /* 连弩：得真能再砍一刀才值得架起来，否则白送一张牌 */
-    if(L.nu && L.slash) return { t:'nu' };
+    /* 连弩：手里至少两张杀才值得架，否则白送一张牌 */
+    if(L.nu && L.slash && hh.filter(function(c){ return c === 'slash'; }).length >= 2) return { t:'nu' };
     if(L.slash) return { t:'slash' };
     if(L.qimou && hh.length >= 2) return { t:'qimou' };
     if(L.wzsy && hh.length <= 3) return { t:'wzsy' };
@@ -1133,7 +1130,7 @@ function corner(h){
 }
 var FC = { wei:'#2E5C8A', shu:'#3B7A3B', wu:'#B03A2E', qun:'#9A7B0A', shen:'#6D4C9F', shi:'#C86A27' };
 var CN = { slash:'杀', dodge:'闪', peach:'桃', wzsy:'无中生有', nu:'诸葛连弩' };
-var DESC = { slash:'攻击对手，对方不出闪则掉血', dodge:'抵消一次杀', peach:'回复 1 点体力', wzsy:'立即摸 2 张牌', nu:'本回合下一张杀伤害 +1' };
+var DESC = { slash:'攻击对手，对方不出闪则掉血', dodge:'抵消一次杀', peach:'回复 1 点体力', wzsy:'立即摸 2 张牌', nu:'本回合出杀不限次数' };
 /* 技能类型标签文案 */
 var KINDS = { locked:'锁定', trigger:'触发', active:'主动' };
 
@@ -1164,7 +1161,7 @@ var HINT = {
   boy:'两刀在手，弃 1 摸 2 换资源，受伤也不缩手牌上限（新手首选）',
   baiyu:'摸得多还能挑着丢，本回合多一刀；关键一杀直接废掉再摸一张',
   qingluan:'杀中补牌；闪成功不吃亏，反手一箭还摸一张',
-  gushan:'五血厚皮，血越少刀越重，每挨一下补三张牌',
+  gushan:'五血厚皮，受伤后每回合第一刀 +1 伤害，每挨一下补两张牌',
   lvbu:'两张闪才挡得住，挡不住就是 2 点；被闪掉也要拆你一张',
   zhaoyun:'杀闪互换、换完补牌，一回合能换两次，攻守一体',
   zhugeliang:'借箭当刀用、不占出刀次数，弃到空手伤害反而 +1',

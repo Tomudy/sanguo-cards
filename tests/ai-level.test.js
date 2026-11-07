@@ -64,20 +64,21 @@ const ids = SG.HEROES.map(h => h.id);
   ok(r < 30, '陪玩档胜率 ' + r.toFixed(1) + '% < 30%（实测基线约 13%）');
 }
 
-/* ---- 3) 高手档强于标准档（高手坐后手劣势席仍需接近五成） ---- */
+/* ---- 3) 高手档明显强于标准档：与后手基线对比，而不是写死阈值 ---- */
 {
-  let w1 = 0, N = 0;
+  let base = 0, hi = 0, N = 0;
   for (const a of ids) for (const b of ids) {
     if (a === b) continue;
     for (let s = 0; s < 10; s++) {
-      const st = play((s * 7919 + 13) | 0, a, b, 1, 2);
+      const seed = (s * 7919 + 13) | 0;
+      if (play(seed, a, b, 1, 1).winner === 1) base++;   /* 标准 vs 标准，后手席 */
+      if (play(seed, a, b, 1, 2).winner === 1) hi++;     /* 高手坐后手席 */
       N++;
-      if (st.winner === 1) w1++;
     }
   }
-  const r = w1 * 100 / N;
-  /* 镜像对打里后手席只有约 40% —— 高手档坐后手仍能到 50% 上下，即相对强度 +10 点 */
-  ok(r > 45, '高手档后手胜率 ' + r.toFixed(1) + '% > 45%（后手基线约 40%）');
+  const rb = 100 * base / N, rh = 100 * hi / N;
+  /* 后手席天然吃亏，关键是"高手档坐后手能比标准档多赢多少" */
+  ok(rh > rb + 5, '高手档后手 ' + rh.toFixed(1) + '% 比后手基线 ' + rb.toFixed(1) + '% 高 5 点以上');
 }
 
 /* ---- 4) 陪玩档行为合法性：懒回合也不出非法动作 ---- */
