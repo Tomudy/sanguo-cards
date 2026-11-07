@@ -277,7 +277,7 @@ AWAIT_ACTIONS = {
     "jinglan": {"jinglan"}, "dodge": {"dodge"},
     "dying": {"dying"}, "save": {"save"}, "discard": {"discard"}, "jinghong": {"jinghong"},
 }
-PLAY_ACTIONS = {"slash", "peach", "wzsy", "ruiqi", "qimou", "lijian", "yehuo", "zhijian", "end"}
+PLAY_ACTIONS = {"slash", "peach", "wzsy", "nu", "ruiqi", "qimou", "lijian", "yehuo", "zhijian", "end"}
 
 
 def check_move(state, move):

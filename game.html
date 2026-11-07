@@ -127,7 +127,7 @@ button:disabled{opacity:.4;cursor:not-allowed;}
   border:1px solid #c3beb0;background:#fff;font-size:13px;line-height:1.3;}
 .card:hover{transform:translateY(-2px);}
 .card.sel{border:2px solid #31597E;}
-.card.slash{color:#B03A2E;} .card.dodge{color:#2E5C8A;} .card.peach{color:#B84B6B;} .card.wzsy{color:#9A7B0A;}
+.card.slash{color:#B03A2E;} .card.dodge{color:#2E5C8A;} .card.peach{color:#B84B6B;} .card.wzsy{color:#9A7B0A;} .card.nu{color:#6D4C9F;}
 .card small{display:block;font-size:10px;color:#8a857a;margin-top:2px;}
 .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
 .tip{font-size:12px;color:#8a4b2a;background:#FBEEE6;border-radius:8px;padding:6px 10px;margin-top:8px;}
@@ -259,7 +259,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 <script id="engine">
 /* ========== 纯逻辑引擎（不碰 DOM，可被 Node 直接加载测试） ========== */
 var SG = (function(){
-  var CARDS = { slash:'杀', dodge:'闪', peach:'桃', wzsy:'无中生有' };
+  var CARDS = { slash:'杀', dodge:'闪', peach:'桃', wzsy:'无中生有', nu:'诸葛连弩' };
 
   var HEROES = [
     { id:'boy', name:'小将军', faction:'shu', hp:4, power:9, handBonus:0, slashLimit:2,
@@ -327,6 +327,7 @@ var SG = (function(){
     for(i=0;i<10;i++) d.push('dodge');
     for(i=0;i<6;i++) d.push('peach');
     for(i=0;i<6;i++) d.push('wzsy');
+    d.push('nu');                       /* 诸葛连弩：全场仅一张，一次性神兵 */
     return d;
   }
 
@@ -345,7 +346,7 @@ var SG = (function(){
       rnd: rnd, deck: shuffle(buildDeck(), rnd), discard: [],
       turn: 0, round: 1, winner: null, over: false, overReason: '',
       log: [], events: [], awaiting: null, selected: [],
-      slashUsed: 0,
+      slashUsed: 0, nuBoost: 0,
       /* AI 难度：0 = 陪玩（会失误），1 = 标准（默认，行为与旧版完全一致），2 = 高手 */
       aiLevel: (opts.aiLevel === 0 ? 0 : (opts.aiLevel === 2 ? 2 : 1)),
       p: [
@@ -393,7 +394,7 @@ var SG = (function(){
     var p = st.turn;
     st.slashUsed = 0;
     st.slashBonus = 0;
-    st.slashFree = 0;
+    st.nuBoost = 0;           /* 连弩加成只持续本回合 */
     st.p[p].used = st.p[p].used || {};
     st.p[p].used.ruiqi = false;
     st.p[p].used.jinglan = false;
@@ -456,7 +457,7 @@ var SG = (function(){
   }
 
   function legal(st){
-    var out = { slash:false, peach:false, wzsy:false, ruiqi:false, end:true };
+    var out = { slash:false, peach:false, wzsy:false, nu:false, ruiqi:false, end:true };
     if(!canAct(st)) return out;
     var p = st.turn, h = st.p[p].hand;
     var opp = 1 - p, oppBlocked = false;
@@ -471,6 +472,7 @@ var SG = (function(){
     out.peach = h.indexOf('peach') >= 0 && st.p[p].hp < st.p[p].maxHp &&
                 (has(st.p[p],'yishi') || !st.p[p].used.peach);
     out.wzsy = h.indexOf('wzsy') >= 0;
+    out.nu = h.indexOf('nu') >= 0 && !st.nuBoost;    /* 加成还没用掉就别浪费第二张 */
     out.ruiqi = has(st.p[p], 'ruiqi') && !st.p[p].used.ruiqi && h.length > 0;
     out.qimou = has(st.p[p], 'qimou') && !st.p[p].used.qimou && h.length > 0;
     out.yehuo = has(st.p[p], 'yehuo') && !st.p[p].used.yehuo && h.length >= 2;
@@ -521,7 +523,6 @@ var SG = (function(){
       }
     }
     if(!noCount) st.slashUsed++;
-    else st.slashFree = (st.slashFree || 0) + 1;
 
     var dmg = 1;
     if(has(st.p[p],'tieji')) dmg += 1;                                   /* 马超：恒定加重 */
@@ -529,6 +530,11 @@ var SG = (function(){
     if(has(st.p[p],'kongcheng') && st.p[p].hand.length <= 1){
       dmg += 1;                                                         /* 诸葛亮：空手出刀更重 */
       say(st, st.p[p].name + ' 手中几乎无牌，【空城】反倒成了杀招，伤害 +1！', p);
+    }
+
+    if(st.nuBoost){
+      st.nuBoost = 0; dmg += 1;
+      say(st, st.p[p].name + ' 的连弩连发两箭，一箭未落一箭又至，伤害 +1！', p);
     }
 
     /* 三种"闪不掉"，触发条件各不相同 */
@@ -804,6 +810,16 @@ var SG = (function(){
     say(st, st.p[p].name + ' 使用【无中生有】，摸 2 张牌。', p);
   }
 
+  /* 诸葛连弩：一次性道具，架起后下一张【杀】两箭齐发，伤害 +1（不占装备区） */
+  function doNu(st){
+    var p = st.turn, i = st.p[p].hand.indexOf('nu');
+    if(i < 0) return;
+    discardCard(st, p, i);
+    st.nuBoost = 1;
+    st.events.push({ type:'card', p:p, name:'诸葛连弩' });
+    say(st, st.p[p].name + ' 架起【诸葛连弩】，箭槽上满，下一张【杀】连发两箭！', p);
+  }
+
   function doRuiqi(st, idx){
     var p = st.turn;
     if(st.p[p].used.ruiqi || idx == null || idx >= st.p[p].hand.length) return;
@@ -852,7 +868,7 @@ var SG = (function(){
                        .slice(0,1).sort(function(x,y){ return y-x; });
     var drop = [], k;
     for(k=0;k<idxs.length;k++) drop.push(discardCard(st, p, idxs[k]));
-    if(!drop.length) drop.push(discardCard(st, p, autoDropIdx(st.p[p].hand, ['wzsy','dodge','slash','peach'])));
+    if(!drop.length) drop.push(discardCard(st, p, autoDropIdx(st.p[p].hand, ['wzsy','nu','dodge','slash','peach'])));
     if(!drop.length) return;
     st.events.push({ type:'skill', p:p, name:'借箭' });
     say(st, st.p[p].name + ' 草船【借箭】，弃置【' + CARDS[drop[0]] + '】，当作一张【杀】放出。', p);
@@ -964,7 +980,7 @@ var SG = (function(){
         return { t:'keep', idxs:keep };
       }
       if(a.type==='trim'){
-        var priT = { wzsy:0, slash:2, dodge:4, peach:6 }, arrT = [], dd = [];
+        var priT = { wzsy:0, slash:2, nu:3, dodge:4, peach:6 }, arrT = [], dd = [];
         for(var mT=0;mT<h.length;mT++){
           var vT = priT[h[mT]];
           arrT.push({ i:mT, v:(vT===undefined?4:vT) });
@@ -987,7 +1003,7 @@ var SG = (function(){
       }
       if(a.type==='jinghong') return { t:'jinghong', use: !(lv === 0 && st.rnd() < 0.5) };
       if(a.type==='discard'){
-        var drop = [], prio = { wzsy:0, slash:2, dodge:4, peach:6 };
+        var drop = [], prio = { wzsy:0, slash:2, nu:3, dodge:4, peach:6 };
         var arr = [];
         for(var m=0;m<h.length;m++) arr.push({ i:m, v:prio[h[m]] });
         arr.sort(function(x,y){ return x.v - y.v; });
@@ -1018,6 +1034,8 @@ var SG = (function(){
     if(L.slash && !realSlash && hh.indexOf('peach') >= 0 && st.p[p].hp <= 2) L.slash = false;
     /* 诸葛亮：手牌少时先借箭，弃到空手正好触发【空城】加重 */
     if(L.zhijian && (hh.length <= 2 || hh.indexOf('slash') < 0)) return { t:'zhijian' };
+    /* 连弩：得真能再砍一刀才值得架起来，否则白送一张牌 */
+    if(L.nu && L.slash) return { t:'nu' };
     if(L.slash) return { t:'slash' };
     if(L.qimou && hh.length >= 2) return { t:'qimou' };
     if(L.wzsy && hh.length <= 3) return { t:'wzsy' };
@@ -1048,6 +1066,7 @@ var SG = (function(){
       case 'slash': doSlash(st); break;
       case 'peach': doPeach(st); break;
       case 'wzsy': doWzsy(st); break;
+      case 'nu': doNu(st); break;
       case 'ruiqi': doRuiqi(st, mv.idx); break;
       case 'qimou': doQimou(st, mv.idx); break;
       case 'lijian': doLijian(st, mv.idx); break;
@@ -1113,8 +1132,8 @@ function corner(h){
          '<span class="corner br ' + t.c + '"><span class="suit">' + t.s + '</span><span class="num">' + h.power + '</span></span>';
 }
 var FC = { wei:'#2E5C8A', shu:'#3B7A3B', wu:'#B03A2E', qun:'#9A7B0A', shen:'#6D4C9F', shi:'#C86A27' };
-var CN = { slash:'杀', dodge:'闪', peach:'桃', wzsy:'无中生有' };
-var DESC = { slash:'攻击对手，对方不出闪则掉血', dodge:'抵消一次杀', peach:'回复 1 点体力', wzsy:'立即摸 2 张牌' };
+var CN = { slash:'杀', dodge:'闪', peach:'桃', wzsy:'无中生有', nu:'诸葛连弩' };
+var DESC = { slash:'攻击对手，对方不出闪则掉血', dodge:'抵消一次杀', peach:'回复 1 点体力', wzsy:'立即摸 2 张牌', nu:'本回合下一张杀伤害 +1' };
 /* 技能类型标签文案 */
 var KINDS = { locked:'锁定', trigger:'触发', active:'主动' };
 
@@ -1443,6 +1462,7 @@ function tapCard(i){
     return;
   }
   if(c==='wzsy'){ if(L.wzsy){ SG.apply(G,{t:'wzsy'}); after(); } return; }
+  if(c==='nu'){ if(L.nu){ SG.apply(G,{t:'nu'}); after(); } return; }
 }
 
 function flash(msg){
@@ -1529,6 +1549,7 @@ function renderActs(){
     '<button' + (L.slash?' class="pri"':' disabled') + ' onclick="act({t:\'slash\'})">出【杀】</button>' +
     '<button' + (L.peach?'':' disabled') + ' onclick="act({t:\'peach\'})">吃【桃】</button>' +
     '<button' + (L.wzsy?'':' disabled') + ' onclick="act({t:\'wzsy\'})">无中生有</button>' +
+    '<button' + (L.nu?' class="pri"':' disabled') + ' onclick="act({t:\'nu\'})">诸葛连弩</button>' +
     (L.qimou ? '<button onclick="act({t:\'qimou\'})">【奇谋】弃1张→1点必中伤害</button>' : '') +
     (L.yehuo ? '<button onclick="act({t:\'yehuo\'})">【业火】弃2张→2点必中伤害</button>' : '') +
     (L.ruiqi ? '<button onclick="ruiqi()">【锐气】弃1摸2</button>' : '') +
@@ -1710,7 +1731,8 @@ var VOICE_LINE = {
   '义释':'义释华容', '咆哮':'咆哮！', '暴喝':'暴喝！', '铁骑':'铁骑冲锋',
   '西凉':'西凉铁骑', '九伐':'九伐中原', '继志':'继承遗志', '胆烈':'胆大如斗',
   '奇谋':'奇谋百出', '勇烈':'勇烈无双', '业火':'业火连天', '顾曲':'顾曲周郎',
-  '凿险':'凿险偷渡', '阴平':'阴平小道', '少年志':'少年之志'
+  '凿险':'凿险偷渡', '阴平':'阴平小道', '少年志':'少年之志',
+  '诸葛连弩':'连弩齐射'
 };
 function speak(text){
   if(!voiceOn || !text) return;
