@@ -199,6 +199,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 <div class="wrap">
   <h1>三国武将 · 亲子对战
     <span class="mute" onclick="toggleMute()">🔊 音效：<span id="muteTxt">开</span></span>
+    <span class="mute" style="margin-right:10px;" onclick="toggleVoice()">🎙 语音：<span id="voiceTxt">开</span></span>
     <span class="mute" style="margin-right:10px;" onclick="toggleBgm()">🥁 战鼓：<span id="bgmTxt">关</span></span>
   </h1>
   <p class="sub">简化规则：只有【杀】【闪】【桃】【无中生有】四种牌。每回合摸 2 张 → 出牌 → 手牌超过体力上限要弃。<br>
@@ -431,7 +432,7 @@ var SG = (function(){
     var p = st.turn;
     if(use){
       draw(st, p, 3);
-      st.events.push({ type:'skill', p:p });
+      st.events.push({ type:'skill', p:p, name:'羽算' });
       say(st, st.p[p].name + ' 发动【羽算】，额外摸 3 张牌、弃掉 1 张，本回合可多出一刀。', p);
       st.slashBonus = (st.slashBonus || 0) + 1;
       st.awaiting = { p:p, type:'trim', n:1 };
@@ -491,7 +492,7 @@ var SG = (function(){
     if((u.yajiao || 0) >= 2) return;
     u.yajiao = (u.yajiao || 0) + 1;
     draw(st, p, 1);
-    st.events.push({ type:'skill', p:p });
+    st.events.push({ type:'skill', p:p, name:'涯角' });
     say(st, st.p[p].name + ' 发动【涯角】，牌势流转，摸 1 张。', p);
   }
 
@@ -515,7 +516,7 @@ var SG = (function(){
         say(st, st.p[p].name + ' 发动【龙胆】，把【闪】当【杀】掷出。', p);
         yajiao(st, p);
       } else if(ghost === 'yonglie'){
-        st.events.push({ type:'skill', p:p });
+        st.events.push({ type:'skill', p:p, name:'勇烈' });
         say(st, st.p[p].name + ' 不计代价！【勇烈】将【桃】当【杀】砍出。', p);
       }
     }
@@ -597,12 +598,12 @@ var SG = (function(){
         st.p[f].used.xiliang = true;
         st.slashBonus = (st.slashBonus || 0) + 1;
         draw(st, f, 1);
-        st.events.push({ type:'skill', p:f });
+        st.events.push({ type:'skill', p:f, name:'西凉' });
         say(st, st.p[f].name + ' 铁骑追击！【西凉】摸 1 张牌，本回合可再出一刀。', f);
       }
       if(has(st.p[f],'xiaohu') && st.p[t].hand.length > 0){
         var dc = discardCard(st, t, autoDropIdx(st.p[t].hand, ['dodge','peach','slash','wzsy']));
-        st.events.push({ type:'skill', p:f });
+        st.events.push({ type:'skill', p:f, name:'虓虎' });
         say(st, st.p[f].name + ' 一声虎啸！【虓虎】逼得 ' + st.p[t].name + ' 弃置【' + CARDS[dc] + '】。', f);
       }
       if(has(st.p[t],'jinghong')){
@@ -629,7 +630,7 @@ var SG = (function(){
         st.p[f].used.zaoxian = true;
         st.slashBonus = (st.slashBonus || 0) + 1;
         draw(st, f, 1);
-        st.events.push({ type:'skill', p:f });
+        st.events.push({ type:'skill', p:f, name:'凿险' });
         say(st, st.p[f].name + ' 发动【凿险】，本回合出【杀】次数 +1，摸 1 张牌。', f);
       }
       if(has(st.p[f],'baohe') && st.p[t].hand.length > 0){
@@ -641,7 +642,7 @@ var SG = (function(){
           if(v < bv){ bv = v; bi = k; }
         }
         var dropped = discardCard(st, t, bi);
-        st.events.push({ type:'skill', p:f });
+        st.events.push({ type:'skill', p:f, name:'暴喝' });
         say(st, st.p[f].name + ' 一声【暴喝】声如巨雷，' + st.p[t].name + ' 弃置了【' + CARDS[dropped] + '】！', f);
       }
       afterAction(st);
@@ -653,7 +654,7 @@ var SG = (function(){
     st.p[t].used.jinglan = true;
     if(use){
       var c = discardCard(st, t, a.cardIdx);
-      st.events.push({ type:'skill', p:t });
+      st.events.push({ type:'skill', p:t, name:'静澜' });
       say(st, st.p[t].name + ' 发动【静澜】，弃置【' + CARDS[c] + '】，此【杀】无效。', t);
       draw(st, t, 1);
       say(st, st.p[t].name + ' 借势回手，摸 1 张牌。', t);
@@ -669,7 +670,7 @@ var SG = (function(){
     var a = st.awaiting, t = a.p, from = st.turn;
     st.p[t].used.jinghong = true;
     if(use){
-      st.events.push({ type:'skill', p:t });
+      st.events.push({ type:'skill', p:t, name:'惊鸿' });
       say(st, st.p[t].name + ' 发动【惊鸿】，反手一箭！', t);
       draw(st, t, 1);
       st.awaiting = null;
@@ -694,7 +695,7 @@ var SG = (function(){
     /* 【空城】：空手时挨打反而清醒，摸一张牌 */
     if(has(st.p[t],'kongcheng') && st.p[t].hand.length <= 1){
       draw(st, t, 1);
-      st.events.push({ type:'skill', p:t });
+      st.events.push({ type:'skill', p:t, name:'空城' });
       say(st, st.p[t].name + ' 手中空空，反倒无牵无挂，【空城】摸 1 张牌。', t);
     }
     /* 【闭月】：打出伤害的人回血（每回合一次，满血时不浪费） */
@@ -710,7 +711,7 @@ var SG = (function(){
       st.p[t].used.jizhi = true;
       st.p[t].hp = 1;
       st.p[t].dying = false;
-      st.events.push({ type:'skill', p:t });
+      st.events.push({ type:'skill', p:t, name:'继志' });
       say(st, '🔥 ' + st.p[t].name + ' 壮志未酬！【继志】硬撑回到 1 点体力。', t);
       st.awaiting = null;
       afterAction(st);
@@ -799,6 +800,7 @@ var SG = (function(){
     discardCard(st, p, i);
     draw(st, p, 2);
     st.events.push({ type:'draw', p:p });
+    st.events.push({ type:'card', p:p, name:'无中生有' });
     say(st, st.p[p].name + ' 使用【无中生有】，摸 2 张牌。', p);
   }
 
@@ -808,7 +810,7 @@ var SG = (function(){
     var c = discardCard(st, p, idx);
     st.p[p].used.ruiqi = true;
     draw(st, p, 2);
-    st.events.push({ type:'skill', p:p });
+    st.events.push({ type:'skill', p:p, name:'锐气' });
     say(st, st.p[p].name + ' 发动【锐气】，弃置【' + CARDS[c] + '】，摸 2 张牌。', p);
   }
 
@@ -818,7 +820,7 @@ var SG = (function(){
     if(idx == null || idx < 0 || idx >= st.p[p].hand.length) idx = autoDropIdx(st.p[p].hand);
     var c = discardCard(st, p, idx);
     st.p[p].used.lijian = true;
-    st.events.push({ type:'skill', p:p });
+    st.events.push({ type:'skill', p:p, name:'离间' });
     say(st, st.p[p].name + ' 发动【离间】，弃置【' + CARDS[c] + '】，令对方弃置两张手牌！', p);
     for(k=0;k<2 && st.p[t].hand.length;k++){
       j = autoDropIdx(st.p[t].hand);
@@ -852,7 +854,7 @@ var SG = (function(){
     for(k=0;k<idxs.length;k++) drop.push(discardCard(st, p, idxs[k]));
     if(!drop.length) drop.push(discardCard(st, p, autoDropIdx(st.p[p].hand, ['wzsy','dodge','slash','peach'])));
     if(!drop.length) return;
-    st.events.push({ type:'skill', p:p });
+    st.events.push({ type:'skill', p:p, name:'借箭' });
     say(st, st.p[p].name + ' 草船【借箭】，弃置【' + CARDS[drop[0]] + '】，当作一张【杀】放出。', p);
     doSlash(st, true, true, true);
   }
@@ -863,7 +865,7 @@ var SG = (function(){
     if(idx == null || idx < 0 || idx >= st.p[p].hand.length) idx = autoDropIdx(st.p[p].hand);
     var c = discardCard(st, p, idx);
     st.p[p].used.qimou = true;
-    st.events.push({ type:'skill', p:p });
+    st.events.push({ type:'skill', p:p, name:'奇谋' });
     say(st, st.p[p].name + ' 发动【奇谋】，弃置【' + CARDS[c] + '】，直取一击（不可闪避）！', p);
     directDamage(st, 1-p, 1, p);
     if(!st.over){
@@ -890,14 +892,14 @@ var SG = (function(){
     }
     if(drop.length < 2) return;
     st.p[p].used.yehuo = true;
-    st.events.push({ type:'skill', p:p });
+    st.events.push({ type:'skill', p:p, name:'业火' });
     say(st, st.p[p].name + ' 发动【业火】，弃置【' + CARDS[drop[0]] + '】【' + CARDS[drop[1]] +
       '】，火烧连营（2 点伤害，不可闪避）！', p);
     directDamage(st, 1-p, 2, p);
     /* 【顾曲】：业火是"烧完还能补牌"的技能，避免弃两牌后手牌见底 */
     if(!st.over && has(st.p[p],'guqu')){
       draw(st, p, 1);
-      st.events.push({ type:'skill', p:p });
+      st.events.push({ type:'skill', p:p, name:'顾曲' });
       say(st, st.p[p].name + ' 一曲既毕，【顾曲】摸回 1 张牌。', p);
     }
     if(!st.over) afterAction(st);
@@ -1344,12 +1346,13 @@ function render(){
       if(ev.p === 0) buzz(ev.n >= 2 ? [70, 50, 70] : 45);  /* 自己受伤才震手机 */
       if(ev.n >= 2) SFX.big(); else SFX.hit();
     }
-    else if(ev.type === 'slash'){ SFX.slash(); flyCard(ev.p); }
-    else if(ev.type === 'dodge') SFX.dodge();
-    else if(ev.type === 'heal') SFX.heal();
+    else if(ev.type === 'slash'){ SFX.slash(); flyCard(ev.p); speak('杀'); }
+    else if(ev.type === 'dodge'){ SFX.dodge(); speak('闪'); }
+    else if(ev.type === 'heal'){ SFX.heal(); speak('桃'); }
     else if(ev.type === 'draw') SFX.draw();
-    else if(ev.type === 'skill') SFX.skill();
-    else if(ev.type === 'dying'){ SFX.dying(); if(ev.p === 0) buzz([180, 80, 180]); }
+    else if(ev.type === 'skill'){ SFX.skill(); if(ev.name) speak(ev.name); }
+    else if(ev.type === 'card'){ speak(ev.name); }
+    else if(ev.type === 'dying'){ SFX.dying(); if(ev.p === 0) buzz([180, 80, 180]); speak('求桃'); }
     else if(ev.type === 'over'){ if(ev.w === 0) SFX.win(); else SFX.lose(); }
   });
   G.events = [];
@@ -1597,6 +1600,14 @@ function unlockAudio(){
   if(c && c.state === 'suspended' && c.resume){
     try{ c.resume(); }catch(e){}
   }
+  /* iOS 的语音合成同样要求手势内先"开口"，播一个静音空句解锁 */
+  try{
+    if(typeof speechSynthesis !== 'undefined' && typeof SpeechSynthesisUtterance !== 'undefined'){
+      var u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0;
+      speechSynthesis.speak(u);
+    }
+  }catch(e){}
 }
 (function(){
   var evs = ['touchstart', 'mousedown', 'click', 'keydown'];
@@ -1660,6 +1671,70 @@ function bgmStep(){
   if(Math.random() < 0.55) noise({ freq:170, dur:0.17, vol:0.055, q:0.8 });
 }
 function toggleMute(){ muted = !muted; document.getElementById('muteTxt').textContent = muted ? '关' : '开'; }
+
+/* ===== 语音播报：浏览器中文 TTS，压低音高 + 放慢语速模拟武侠旁白 =====
+   不加载任何音频文件；没有中文 TTS 的设备自动静默，不影响游戏。 */
+var voiceOn = true, _vLast = 0, _vVoice = null;
+function _vsyn(){
+  try{ return (typeof speechSynthesis !== 'undefined') ? speechSynthesis : null; }catch(e){ return null; }
+}
+function pickWuxiaVoice(){
+  var syn = _vsyn(); if(!syn) return null;
+  var vs = [];
+  try{ vs = syn.getVoices() || []; }catch(e){ return null; }
+  var zh = vs.filter(function(v){
+    return /zh|cmn|Chinese/i.test(v.lang || '') || /中文|普通话/.test(v.name || '');
+  });
+  if(!zh.length) return null;
+  /* 优先男声（旁白感更足），找不到就用任意中文音色 */
+  var male = ['yunyang','云扬','yunxi','云希','yunjian','云健','kangkang','康康','yuning','li-mu'];
+  for(var i = 0; i < male.length; i++){
+    for(var j = 0; j < zh.length; j++){
+      if((zh[j].name || '').toLowerCase().indexOf(male[i]) >= 0) return zh[j];
+    }
+  }
+  return zh[0];
+}
+(function(){
+  var syn = _vsyn(); if(!syn) return;
+  _vVoice = pickWuxiaVoice();
+  /* 音色列表可能异步加载，加载完再挑一次 */
+  try{ syn.onvoiceschanged = function(){ _vVoice = pickWuxiaVoice(); }; }catch(e){}
+})();
+/* 技能播报台词：干净的四字典故，比裸技能名更有江湖味；没有对应台词的直接用技能名 */
+var VOICE_LINE = {
+  '锐气':'锐气正盛', '羽算':'羽扇纶巾', '静澜':'静澜不动', '穿杨':'百步穿杨',
+  '惊鸿':'惊鸿一瞥', '猛力':'猛力一击', '斗志':'斗志昂扬', '无双':'无双！',
+  '虓虎':'虓虎之威', '龙胆':'龙胆亮银枪', '涯角':'涯角无涯', '空城':'空城之计',
+  '借箭':'草船借箭', '离间':'离间之计', '闭月':'闭月羞花', '武圣':'武圣在此',
+  '义释':'义释华容', '咆哮':'咆哮！', '暴喝':'暴喝！', '铁骑':'铁骑冲锋',
+  '西凉':'西凉铁骑', '九伐':'九伐中原', '继志':'继承遗志', '胆烈':'胆大如斗',
+  '奇谋':'奇谋百出', '勇烈':'勇烈无双', '业火':'业火连天', '顾曲':'顾曲周郎',
+  '凿险':'凿险偷渡', '阴平':'阴平小道', '少年志':'少年之志'
+};
+function speak(text){
+  if(!voiceOn || !text) return;
+  var syn = _vsyn(); if(!syn) return;
+  var now = Date.now();
+  if(now - _vLast < 260) return;          /* 连打时别叠成噪音 */
+  _vLast = now;
+  var line = VOICE_LINE[text] || text;    /* 技能名换成江湖台词 */
+  try{
+    syn.cancel();                          /* 新播报打断旧的，保持利落 */
+    var u = new SpeechSynthesisUtterance(line);
+    if(_vVoice){ u.voice = _vVoice; u.lang = _vVoice.lang; } else { u.lang = 'zh-CN'; }
+    u.pitch = 0.78;                        /* 压低：旁白腔 */
+    u.rate = 0.88;                         /* 放慢：一字一顿 */
+    u.volume = 0.95;
+    syn.speak(u);
+  }catch(e){}
+}
+function toggleVoice(){
+  voiceOn = !voiceOn;
+  document.getElementById('voiceTxt').textContent = voiceOn ? '开' : '关';
+  if(!voiceOn){ try{ var syn = _vsyn(); if(syn) syn.cancel(); }catch(e){} }
+  else speak('语音已开启');
+}
 function toggleBgm(){
   bgmOn = !bgmOn;
   document.getElementById('bgmTxt').textContent = bgmOn ? '开' : '关';
