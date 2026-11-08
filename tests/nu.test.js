@@ -17,7 +17,7 @@ ok(SG.CARDS.nu === '诸葛连弩', 'CARDS 里有诸葛连弩');
   const st = SG.newGame({ seed: 1, p0: 'boy', p1: 'zhangfei' });
   const all = st.p[0].hand.concat(st.p[1].hand, st.deck, st.discard);
   ok(all.filter(c => c === 'nu').length === 1, '整副牌只有 1 张连弩');
-  ok(all.length === 64, '牌总数 64（实际 ' + all.length + '）');
+  ok(all.length === 75, '牌总数 75（实际 ' + all.length + '）');
 }
 
 /* 2. 架弩后本回合出杀不限次数（张飞基础 2 刀，连弩后可打第 3 刀） */

@@ -42,7 +42,7 @@ function fixJudge(st, v) { st.rnd = () => v; }
   const st = SG.newGame({ seed: 1, p0: 'boy', p1: 'lvbu' });
   const all = st.p[0].hand.concat(st.p[1].hand, st.deck, st.discard);
   const cnt = id => all.filter(c => c === id).length;
-  ok(all.length === 64, '整副牌 64 张（实际 ' + all.length + '）');
+  ok(all.length === 75, '整副牌 75 张（实际 ' + all.length + '）');
   ok(Object.keys(SG.EQUIPS).length === 6, '装备共 6 种');
   ok(cnt('qinggang') === 2 && cnt('qinglong') === 2 && cnt('guding') === 1,
      '武器：青釭 2 / 青龙 2 / 古锭 1');
@@ -223,7 +223,7 @@ function fixJudge(st, v) { st.rnd = () => v; }
       const eqn = ['weapon', 'armor'].reduce((k, slot) =>
         k + (st.p[0].equip[slot] ? 1 : 0) + (st.p[1].equip[slot] ? 1 : 0), 0);
       const all = st.deck.length + st.discard.length + st.p[0].hand.length + st.p[1].hand.length + eqn;
-      if (all !== 64) bad++;
+      if (all !== 75) bad++;
       const mv = SG.aiStep(st);
       if (!mv) break;
       SG.apply(st, mv);

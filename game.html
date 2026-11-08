@@ -135,6 +135,9 @@ button:disabled{opacity:.4;cursor:not-allowed;}
 .card.slash{color:#B03A2E;} .card.dodge{color:#2E5C8A;} .card.peach{color:#B84B6B;} .card.wzsy{color:#9A7B0A;} .card.nu{color:#6D4C9F;}
 .card.qinggang,.card.qinglong,.card.guding,.card.bagua,.card.shizi,.card.huxin{
   color:#8A6D1F;background:#FDF8EA;border-color:#D8C48E;}
+.card.jiu{color:#9A5B1E;background:#FDF4E8;border-color:#E0C7A8;}
+.card.juedou{color:#8A2F28;background:#FCEFEC;border-color:#E5BDB6;}
+.card.guohe,.card.shunshou{color:#2F6A4F;background:#EEF7F1;border-color:#B8D8C5;}
 .card small{display:block;font-size:10px;color:#8a857a;margin-top:2px;}
 .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
 .tip{font-size:12px;color:#8a4b2a;background:#FBEEE6;border-radius:8px;padding:6px 10px;margin-top:8px;}
@@ -209,7 +212,10 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
     <span class="mute" style="margin-right:10px;" onclick="toggleVoice()">🎙 语音：<span id="voiceTxt">开</span></span>
     <span class="mute" style="margin-right:10px;" onclick="toggleBgm()">🥁 战鼓：<span id="bgmTxt">关</span></span>
   </h1>
-  <p class="sub">简化规则：基本牌【杀】【闪】【桃】【无中生有】+ 神兵【诸葛连弩】+ 6 种装备。每回合摸 2 张 → 出牌 → 手牌超过体力上限要弃。<br>
+  <p class="sub">简化规则：基本牌【杀】【闪】【桃】【无中生有】+ 战术牌【酒】【决斗】【过河拆桥】【顺手牵羊】
+  + 神兵【诸葛连弩】+ 6 种装备。每回合摸 2 张 → 出牌 → 手牌超过体力上限要弃。<br>
+  战术牌：<b>酒</b>下一刀 +1（濒死时能当桃救命）· <b>决斗</b>双方轮流出【杀】，先接不上的一方掉 1 血 ·
+  <b>过河拆桥</b>拆掉对方一张牌 · <b>顺手牵羊</b>把对方一张牌抢过来（装备直接换上）。<br>
   装备：武器位、防具位各一格，装上就长期生效、不占手牌；同槽位装新的会替换旧的。<br>
   出杀次数：小将军 2 次、张飞 2 次、神姜维 3 次，其余武将 1 次；每回合只能吃 1 张【桃】。<br>
   <b style="color:#B03A2E;">濒死规则</b>：体力被打到 0 时不立即判负，而是进入濒死 —— 你可以打出一张【桃】救回自己（体力回到 1 点，濒死求桃不受"每回合 1 张"限制）；
@@ -268,6 +274,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 /* ========== 纯逻辑引擎（不碰 DOM，可被 Node 直接加载测试） ========== */
 var SG = (function(){
   var CARDS = { slash:'杀', dodge:'闪', peach:'桃', wzsy:'无中生有', nu:'诸葛连弩',
+                jiu:'酒', juedou:'决斗', guohe:'过河拆桥', shunshou:'顺手牵羊',
                 qinggang:'青釭剑', qinglong:'青龙偃月刀', guding:'古锭刀',
                 bagua:'八卦阵', shizi:'白银狮子', huxin:'护心镜' };
 
@@ -301,7 +308,7 @@ var SG = (function(){
               {id:'jinghong',name:'惊鸿',kind:'trigger',desc:'当你使用【闪】抵消【杀】后，你可以对使用者造成 1 点伤害，然后摸一张牌。'}] },
     { id:'gushan', name:'虎痴·关山', faction:'qun', hp:5, power:8, handBonus:0, slashLimit:1,
       skills:[{id:'mengli',name:'猛力',kind:'locked',desc:'锁定技，每回合限一次，当你已受伤时，你的【杀】伤害 +1。'},
-              {id:'douzhi',name:'斗志',kind:'locked',desc:'锁定技，当你受到伤害后，你摸两张牌。'}] },
+              {id:'douzhi',name:'斗志',kind:'locked',desc:'锁定技，当你受到伤害后，你摸一张牌。'}] },
     { id:'lvbu', name:'吕布', faction:'qun', hp:4, power:9, handBonus:0, slashLimit:1,
       skills:[{id:'wushuang',name:'无双',kind:'locked',desc:'锁定技，你使用【杀】时，对方需两张【闪】才能抵消；未能抵消则受到 2 点伤害。'},
               {id:'xiaohu',name:'虓虎',kind:'locked',desc:'锁定技，当你的【杀】被【闪】抵消后，你弃置对方一张手牌。'}] },
@@ -356,6 +363,11 @@ var SG = (function(){
     for(i=0;i<8;i++)  d.push('peach');
     for(i=0;i<6;i++)  d.push('wzsy');
     d.push('nu');                       /* 诸葛连弩：全场仅一张，一次性神兵 */
+    /* 战术牌 11 张：酒 3 / 决斗 3 / 过河拆桥 3 / 顺手牵羊 2 */
+    for(i=0;i<3;i++) d.push('jiu');
+    for(i=0;i<3;i++) d.push('juedou');
+    for(i=0;i<3;i++) d.push('guohe');
+    for(i=0;i<2;i++) d.push('shunshou');
     /* 装备 9 张：武器 5（青釭 2 / 青龙 2 / 古锭 1）、防具 4（八卦 2 / 白银 1 / 护心镜 1） */
     for(i=0;i<2;i++) d.push('qinggang');
     for(i=0;i<2;i++) d.push('qinglong');
@@ -363,7 +375,7 @@ var SG = (function(){
     for(i=0;i<2;i++) d.push('bagua');
     d.push('shizi');
     d.push('huxin');
-    return d;                           /* 共 64 张 */
+    return d;                           /* 共 75 张 */
   }
 
   function shuffle(arr, rnd){
@@ -381,7 +393,7 @@ var SG = (function(){
       rnd: rnd, deck: shuffle(buildDeck(), rnd), discard: [],
       turn: 0, round: 1, winner: null, over: false, overReason: '',
       log: [], events: [], awaiting: null, selected: [],
-      slashUsed: 0, nuActive: false,
+      slashUsed: 0, nuActive: false, jiuBoost: 0,
       /* AI 难度：0 = 陪玩（会失误），1 = 标准（默认，行为与旧版完全一致），2 = 高手 */
       aiLevel: (opts.aiLevel === 0 ? 0 : (opts.aiLevel === 2 ? 2 : 1)),
       p: [
@@ -432,11 +444,13 @@ var SG = (function(){
     st.slashUsed = 0;
     st.slashBonus = 0;
     st.nuActive = false;      /* 连弩只持续本回合 */
+    st.jiuBoost = 0;          /* 酒的加成也只持续本回合 */
     st.p[p].used = st.p[p].used || {};
     st.p[p].used.ruiqi = false;
     st.p[p].used.jinglan = false;
     st.p[p].used.jinghong = false;
     st.p[p].used.peach = false;
+    st.p[p].used.jiu = false;
     st.p[p].used.qimou = false;
     st.p[p].used.yehuo = false;
     st.p[p].used.lijian = false;
@@ -497,7 +511,8 @@ var SG = (function(){
   }
 
   function legal(st){
-    var out = { slash:false, peach:false, wzsy:false, nu:false, ruiqi:false, end:true };
+    var out = { slash:false, peach:false, wzsy:false, nu:false, ruiqi:false, end:true,
+                jiu:false, juedou:false, guohe:false, shunshou:false };
     if(!canAct(st)) return out;
     var p = st.turn, h = st.p[p].hand;
     var opp = 1 - p, oppBlocked = false;
@@ -519,6 +534,14 @@ var SG = (function(){
     out.yehuo = has(st.p[p], 'yehuo') && !st.p[p].used.yehuo && h.length >= 2;
     /* 借箭：不占本回合出刀次数，只受每回合一次的技能限制 */
     out.zhijian = has(st.p[p], 'jiejian') && !st.p[p].used.zhijian && h.length >= 1 && !oppBlocked;
+    /* 酒：每回合限一碗，已经蓄过劲就别再喝（叠不上去） */
+    out.jiu = h.indexOf('jiu') >= 0 && !st.p[p].used.jiu && !st.jiuBoost;
+    /* 决斗：只要手里有这张牌就能发起 */
+    out.juedou = h.indexOf('juedou') >= 0;
+    /* 拆桥 / 顺手：对方得有牌可动（手牌或装备） */
+    var foeHas = !!(st.p[opp].hand.length > 0 || eqp(st,opp).weapon || eqp(st,opp).armor);
+    out.guohe = h.indexOf('guohe') >= 0 && foeHas;
+    out.shunshou = h.indexOf('shunshou') >= 0 && foeHas;
     /* 装备：手里有装备牌就能打进装备区（同槽位自动替换旧装备） */
     out.equip = equipIdxOf(h, 'weapon') >= 0 || equipIdxOf(h, 'armor') >= 0;
     return out;
@@ -686,6 +709,14 @@ var SG = (function(){
       dmg += 2;
       st.events.push({ type:'skill', p:p, name:'古锭刀' });
       say(st, st.p[t].name + ' 手无寸牌，【古锭刀】一击见血，伤害 +2！', p);
+    }
+
+    /* 【酒】：本回合蓄的那一碗，下一刀实打实 +1 */
+    if(st.jiuBoost > 0){
+      st.jiuBoost = 0;
+      dmg += 1;
+      st.events.push({ type:'skill', p:p, name:'酒' });
+      say(st, '🍶 ' + st.p[p].name + ' 酒劲上涌，这一刀把力气全压上了（伤害 +1）！', p);
     }
 
     /* 三种"闪不掉"，触发条件各不相同 */
@@ -861,8 +892,8 @@ var SG = (function(){
     st.events.push({ type:'damage', p:t, n:n });
     say(st, st.p[t].name + ' 失去 ' + n + ' 点体力（剩余 ' + Math.max(0,st.p[t].hp) + '）。', t);
     if(has(st.p[t],'douzhi')){
-      draw(st, t, 2);
-      say(st, st.p[t].name + ' 发动【斗志】，挨打更来劲，摸 2 张牌。', t);
+      draw(st, t, 1);
+      say(st, st.p[t].name + ' 发动【斗志】，挨打更来劲，摸 1 张牌。', t);
     }
     /* 【空城】：空手时挨打反而清醒，摸一张牌 */
     if(has(st.p[t],'kongcheng') && st.p[t].hand.length <= 1){
@@ -912,20 +943,29 @@ var SG = (function(){
   }
 
   /* 濒死结算：先问濒死者自己，没桃再问对手是否出手相救 */
+  /* 濒死能拿什么救命：【桃】优先，其次【酒】（酒在三国杀里本来就能当桃用） */
+  function reviveIdx(h){
+    var i = h.indexOf('peach');
+    if(i >= 0) return { i:i, name:'桃' };
+    i = h.indexOf('jiu');
+    if(i >= 0) return { i:i, name:'酒' };
+    return { i:-1, name:'' };
+  }
+
   function resolveDying(st, use){
     var a = st.awaiting, t = a.p, o = 1 - t;
-    var pi = st.p[t].hand.indexOf('peach');
-    if(use && pi >= 0){
-      discardCard(st, t, pi);
+    var rv = reviveIdx(st.p[t].hand);
+    if(use && rv.i >= 0){
+      discardCard(st, t, rv.i);
       st.p[t].hp = 1;
       st.p[t].dying = false;
       st.events.push({ type:'heal', p:t });
-      say(st, st.p[t].name + ' 用【桃】续命，体力回到 1 点，绝处逢生！', t);
+      say(st, st.p[t].name + ' 用【' + rv.name + '】续命，体力回到 1 点，绝处逢生！', t);
       st.awaiting = null;
       afterAction(st);
       return;
     }
-    if(st.p[o].hand.indexOf('peach') >= 0){
+    if(reviveIdx(st.p[o].hand).i >= 0){
       st.awaiting = { p:o, type:'save', dying:t };
       return;
     }
@@ -935,13 +975,13 @@ var SG = (function(){
 
   function resolveSave(st, use){
     var a = st.awaiting, o = a.p, t = a.dying;
-    var pi = st.p[o].hand.indexOf('peach');
-    if(use && pi >= 0){
-      discardCard(st, o, pi);
+    var rv = reviveIdx(st.p[o].hand);
+    if(use && rv.i >= 0){
+      discardCard(st, o, rv.i);
       st.p[t].hp = 1;
       st.p[t].dying = false;
       st.events.push({ type:'heal', p:t });
-      say(st, '🤝 ' + st.p[o].name + ' 念在对手之情，出【桃】救了 ' + st.p[t].name + ' 一命！', o);
+      say(st, '🤝 ' + st.p[o].name + ' 念在对手之情，出【' + rv.name + '】救了 ' + st.p[t].name + ' 一命！', o);
       st.awaiting = null;
       afterAction(st);
       return;
@@ -992,6 +1032,105 @@ var SG = (function(){
     st.nuActive = true;
     st.events.push({ type:'card', p:p, name:'诸葛连弩' });
     say(st, st.p[p].name + ' 架起【诸葛连弩】，箭槽上满，本回合出【杀】不再受次数限制！', p);
+  }
+
+  /* ===== 战术牌：酒 / 决斗 / 过河拆桥 / 顺手牵羊 ===== */
+
+  /* 【酒】：每回合限一碗，本回合下一张【杀】伤害 +1；濒死时还能当【桃】用 */
+  function doJiu(st){
+    var p = st.turn, i = st.p[p].hand.indexOf('jiu');
+    if(i < 0 || st.p[p].used.jiu || st.jiuBoost > 0) return;
+    discardCard(st, p, i);
+    st.p[p].used.jiu = true;
+    st.jiuBoost = 1;
+    st.events.push({ type:'card', p:p, name:'酒' });
+    say(st, '🍶 ' + st.p[p].name + ' 饮下一碗烈酒，本回合下一张【杀】伤害 +1。', p);
+  }
+
+  /* 谁手里那张牌能当【杀】：真杀 > 龙胆把闪当杀 > 勇烈把桃当杀 */
+  function slashIdxIn(h, pl){
+    var i = h.indexOf('slash'), ghost = '';
+    if(i < 0 && has(pl,'longdan')){ i = h.indexOf('dodge'); if(i >= 0) ghost = 'longdan'; }
+    if(i < 0 && has(pl,'yonglie')){ i = h.indexOf('peach'); if(i >= 0) ghost = 'yonglie'; }
+    return { i:i, ghost:ghost };
+  }
+
+  /* 【决斗】：目标先出【杀】，双方轮流接，谁先接不上谁吃 1 点伤害（来源是对手） */
+  function doJuedou(st){
+    var p = st.turn, t = 1-p, i = st.p[p].hand.indexOf('juedou');
+    if(i < 0) return;
+    discardCard(st, p, i);
+    st.events.push({ type:'card', p:p, name:'决斗' });
+    say(st, '⚔️ ' + st.p[p].name + ' 掷下【决斗】战书，' + st.p[t].name + ' 必须先出【杀】！', p);
+    st.awaiting = { p:t, type:'duel', foe:p };
+  }
+
+  function resolveDuel(st, use){
+    var a = st.awaiting, t = a.p, f = a.foe;
+    var pick = use ? slashIdxIn(st.p[t].hand, st.p[t]) : { i:-1, ghost:'' };
+    if(pick.i < 0){
+      st.awaiting = null;
+      say(st, '⚔️ ' + st.p[t].name + ' 接不上【杀】，【决斗】落败！', t);
+      dealDamage(st, t, 1, f);
+      if(!st.over && !st.awaiting) afterAction(st);
+      return;
+    }
+    discardCard(st, t, pick.i);
+    if(pick.ghost === 'longdan'){
+      say(st, st.p[t].name + ' 发动【龙胆】，把【闪】当【杀】接住。', t);
+      yajiao(st, t);
+    } else if(pick.ghost === 'yonglie'){
+      say(st, st.p[t].name + ' 不计代价！【勇烈】将【桃】当【杀】接住。', t);
+    } else {
+      say(st, st.p[t].name + ' 打出一张【杀】接住。', t);
+    }
+    st.awaiting = { p:f, type:'duel', foe:t };
+  }
+
+  /* 【过河拆桥】/【顺手牵羊】：先打出牌，再让对方选一张牌（装备优先给选项） */
+  function doStealLike(st, kind){
+    var p = st.turn, t = 1-p, i = st.p[p].hand.indexOf(kind);
+    if(i < 0) return;
+    discardCard(st, p, i);
+    st.events.push({ type:'card', p:p, name:CARDS[kind] });
+    say(st, (kind === 'guohe' ? '🌉 ' : '🐑 ') + st.p[p].name + ' 使用【' + CARDS[kind] +
+      '】，要动 ' + st.p[t].name + ' 的一张牌。', p);
+    st.awaiting = { p:p, type:kind, t:t };
+  }
+
+  function resolveStealLike(st, mv){
+    var a = st.awaiting, p = a.p, t = a.t, kind = a.type;
+    st.awaiting = null;
+    var slot = mv && mv.slot, card = null, E = eqp(st, t);
+    if((slot === 'weapon' || slot === 'armor') && E[slot]){
+      card = E[slot];
+      E[slot] = null;
+      if(kind === 'guohe'){
+        st.discard.push(card);
+        say(st, '🌉 ' + st.p[p].name + ' 拆掉了 ' + st.p[t].name + ' 的【' + EQUIPS[card].name + '】。', p);
+      } else {
+        /* 顺手牵羊：抢过来当场换上，自己同槽位的旧装备进弃牌堆 */
+        var mine = eqp(st, p), old = mine[EQUIPS[card].slot];
+        mine[EQUIPS[card].slot] = card;
+        if(old) st.discard.push(old);
+        say(st, '🐑 ' + st.p[p].name + ' 顺手牵羊，夺得【' + EQUIPS[card].name + '】当场换上' +
+          (old ? '，替换下【' + EQUIPS[old].name + '】' : '') + '。', p);
+      }
+    } else if(st.p[t].hand.length){
+      var n = st.p[t].hand.length;
+      var k = (mv && typeof mv.idx === 'number' && mv.idx >= 0 && mv.idx < n)
+        ? mv.idx : Math.floor(st.rnd() * n);
+      card = st.p[t].hand.splice(k, 1)[0];
+      if(kind === 'guohe'){
+        st.discard.push(card);
+        say(st, '🌉 ' + st.p[p].name + ' 拆掉 ' + st.p[t].name + ' 一张手牌【' + CARDS[card] + '】。', p);
+      } else {
+        st.p[p].hand.push(card);
+        say(st, '🐑 ' + st.p[p].name + ' 顺手牵羊，摸走 ' + st.p[t].name + ' 一张手牌【' + CARDS[card] + '】。', p);
+      }
+    }
+    if(!card) say(st, st.p[t].name + ' 手无余牌，无从下手。', p);
+    afterAction(st);
   }
 
   function doRuiqi(st, idx){
@@ -1134,6 +1273,20 @@ var SG = (function(){
     say(st, '==== ' + st.overReason + ' ====');
   }
 
+  /* AI 挑对方一张牌：先动装备（越强越先），没装备就摸手牌 */
+  function aiPickSlot(st, me, foe, lv){
+    var E = eqp(st, foe), M = eqp(st, me);
+    if(lv === 2){
+      /* 高手：抢来就能用的才叫赚——优先补自己的空槽位 */
+      if(!M.weapon && E.weapon && (!M.armor || equipScore(E.weapon) >= equipScore(E.armor))) return 'weapon';
+      if(!M.armor && E.armor) return 'armor';
+    }
+    if(E.armor && E.weapon) return equipScore(E.armor) >= equipScore(E.weapon) ? 'armor' : 'weapon';
+    if(E.armor) return 'armor';
+    if(E.weapon) return 'weapon';
+    return 'hand';
+  }
+
   /* --- AI --- */
   function aiStep(st){
     if(st.over) return null;
@@ -1156,7 +1309,8 @@ var SG = (function(){
         return { t:'keep', idxs:keep };
       }
       if(a.type==='trim'){
-        var priT = { wzsy:0, slash:2, nu:3, dodge:4, peach:6 }, arrT = [], dd = [];
+        var priT = { wzsy:0, jiu:1, juedou:2, shunshou:2, slash:2, guohe:3, nu:3, dodge:4, peach:6 };
+        var arrT = [], dd = [];
         for(var mT=0;mT<h.length;mT++){
           var vT = priT[h[mT]];
           arrT.push({ i:mT, v:(vT===undefined?4:vT) });
@@ -1168,6 +1322,23 @@ var SG = (function(){
       if(a.type==='dying') return { t:'dying', use: h.indexOf('peach') >= 0 };
       if(a.type==='save') return { t:'save', use: lv === 0 && st.rnd() < 0.5 };  /* 陪玩档心软，可能救你 */
       if(a.type==='jinglan') return { t:'jinglan', use: !(lv === 0 && st.rnd() < 0.5) };
+      if(a.type==='duel'){
+        var pk = slashIdxIn(h, st.p[p]);
+        var canDuelS = pk.i >= 0;
+        if(lv === 2 && canDuelS){
+          /* 高手会数杀：决斗后手方要连出，我的杀（含龙胆/勇烈转换）>= 对方手牌数才稳赢 */
+          var nMy = 0, nOpp = st.p[1-p].hand.length;
+          if(h.indexOf('slash') >= 0) nMy++;
+          if(has(st.p[p],'longdan') && h.indexOf('dodge') >= 0) nMy++;
+          if(has(st.p[p],'yonglie') && h.indexOf('peach') >= 0) nMy++;
+          return { t:'duel', use: nMy >= nOpp || st.p[p].hp >= 3 };
+        }
+        /* 标准档：有杀就接；陪玩档约三成"手滑"接不上 */
+        return { t:'duel', use: canDuelS && !(lv === 0 && st.rnd() < 0.3) };
+      }
+      if(a.type==='guohe' || a.type==='shunshou'){
+        return { t:a.type, slot: aiPickSlot(st, p, a.t, lv) };
+      }
       if(a.type==='dodge'){
         var hasDodge = a.canDodge && (h.indexOf('dodge') >= 0 || (has(st.p[p],'longdan') && h.indexOf('slash') >= 0));
         var worth = a.dmg + (has(st.p[p],'jinghong') ? 1 : 0);   /* 惊鸿：闪完还能反打一点 */
@@ -1187,7 +1358,7 @@ var SG = (function(){
       }
       if(a.type==='jinghong') return { t:'jinghong', use: !(lv === 0 && st.rnd() < 0.5) };
       if(a.type==='discard'){
-        var drop = [], prio = { wzsy:0, slash:2, nu:3, dodge:4, peach:6 };
+        var drop = [], prio = { wzsy:0, jiu:1, juedou:2, shunshou:2, slash:2, guohe:3, nu:3, dodge:4, peach:6 };
         var arr = [];
         for(var m=0;m<h.length;m++){
           var pv = prio[h[m]];
@@ -1212,6 +1383,22 @@ var SG = (function(){
       return { t:'equip', idx:aiA };
     if(aiW >= 0 && (!E.weapon || equipScore(hh[aiW]) > equipScore(E.weapon) + 1))
       return { t:'equip', idx:aiW };
+    /* 顺手牵羊 > 过河拆桥：抢过来自己还能用，优先动对方的装备 */
+    var foeE = eqp(st, 1-p);
+    if(L.shunshou && (foeE.weapon || foeE.armor)) return { t:'shunshou' };
+    if(L.guohe && (foeE.weapon || foeE.armor)) return { t:'guohe' };
+    /* 决斗：对方先出杀，他手牌少的时候发起最划算（高手卡得更准） */
+    if(L.juedou && (st.p[1-p].hand.length === 0 ||
+        (hh.indexOf('slash') >= 0 && st.p[1-p].hand.length <= (lv === 2 ? 2 : 3))))
+      return { t:'juedou' };
+    /* 酒：标准档差两血就喝；高手不浪费——要么搏命（hp<=1），要么算准这一刀大概率闪不掉 */
+    if(L.jiu && hh.indexOf('slash') >= 0){
+      if(lv === 2){
+        if(st.p[1-p].hp <= 1 ||
+           (st.p[1-p].hp <= 3 && (st.p[1-p].hand.length <= 1 ||
+             eqp(st,p).weapon === 'qinggang'))) return { t:'jiu' };
+      } else if(st.p[1-p].hp <= 2) return { t:'jiu' };
+    }
     if(lv === 2){
       /* 高手档：先算斩杀线——直伤够收人头就不赌出杀 */
       var foe = st.p[1-p];
@@ -1266,6 +1453,17 @@ var SG = (function(){
       case 'lijian': doLijian(st, mv.idx); break;
       case 'yehuo': doYehuo(st, mv.idxs); break;
       case 'zhijian': doZhijian(st, mv.idxs); break;
+      case 'jiu': doJiu(st); break;
+      case 'juedou': doJuedou(st); break;
+      case 'duel': resolveDuel(st, mv.use); break;
+      case 'guohe':
+        if(st.awaiting && st.awaiting.type === 'guohe') resolveStealLike(st, mv);
+        else doStealLike(st, 'guohe');
+        break;
+      case 'shunshou':
+        if(st.awaiting && st.awaiting.type === 'shunshou') resolveStealLike(st, mv);
+        else doStealLike(st, 'shunshou');
+        break;
       case 'equip': doEquip(st, mv.idx); break;
       case 'bagua': doBagua(st); break;
       case 'qinglong': doQinglong(st, mv.use); break;
@@ -1331,10 +1529,13 @@ function corner(h){
 }
 var FC = { wei:'#2E5C8A', shu:'#3B7A3B', wu:'#B03A2E', qun:'#9A7B0A', shen:'#6D4C9F', shi:'#C86A27' };
 var CN = { slash:'杀', dodge:'闪', peach:'桃', wzsy:'无中生有', nu:'诸葛连弩',
+  jiu:'酒', juedou:'决斗', guohe:'过河拆桥', shunshou:'顺手牵羊',
   qinggang:'青釭剑', qinglong:'青龙偃月刀', guding:'古锭刀',
   bagua:'八卦阵', shizi:'白银狮子', huxin:'护心镜' };
 var DESC = { slash:'攻击对手，对方不出闪则掉血', dodge:'抵消一次杀', peach:'回复 1 点体力',
   wzsy:'立即摸 2 张牌', nu:'本回合出杀不限次数',
+  jiu:'下一张杀伤害 +1（濒死可当桃）', juedou:'轮流出杀，先没杀的一方掉 1 血',
+  guohe:'拆掉对方一张牌', shunshou:'夺得对方一张牌',
   qinggang:'你的杀无视对方防具', qinglong:'杀被闪掉可再补一刀',
   guding:'对方空手时伤害 +2', bagua:'判定红色可当闪用',
   shizi:'受到的杀伤害最多 1 点', huxin:'濒死时自动保命一次' };
@@ -1628,7 +1829,8 @@ function viewIdx(){ return mode === 'ai' ? 0 : SG.active(G); }
 function renderHand(){
   var box = document.getElementById('hand');
   var vi = viewIdx();
-  document.getElementById('handLabel').textContent = '手牌（' + G.p[vi].name + '，点牌可使用 / 选中）';
+  document.getElementById('handLabel').textContent = '手牌（' + G.p[vi].name + '，点牌可使用 / 选中）' +
+    (G.jiuBoost ? ' · 🍶 酒劲已备：下一张【杀】伤害 +1' : '');
   if(!G.p[vi] || !G.p[vi].hand.length){ box.innerHTML = '<span style="color:#a9a396;font-size:13px;">（没有手牌）</span>'; return; }
   var clickable = (SG.active(G) === vi);
   box.innerHTML = G.p[vi].hand.map(function(c,i){
@@ -1658,16 +1860,17 @@ function tapCard(i){
     return;
   }
   if(a && a.type==='dying'){
-    if(c==='peach'){ SG.apply(G, { t:'dying', use:true }); sel=[]; after(); }
-    else flash('濒死时只有【桃】能救命，也可以点上面的按钮。');
+    if(c==='peach' || c==='jiu'){ SG.apply(G, { t:'dying', use:true }); sel=[]; after(); }
+    else flash('濒死时只有【桃】或【酒】能救命，也可以点上面的按钮。');
     return;
   }
   if(a && a.type==='save'){
-    if(c==='peach'){ SG.apply(G, { t:'save', use:true }); sel=[]; after(); }
-    else flash('只有【桃】能救人，也可以点上面的按钮。');
+    if(c==='peach' || c==='jiu'){ SG.apply(G, { t:'save', use:true }); sel=[]; after(); }
+    else flash('只有【桃】或【酒】能救人，也可以点上面的按钮。');
     return;
   }
-  if(a && (a.type==='jinglan' || a.type==='jinghong')) return;
+  if(a && (a.type==='jinglan' || a.type==='jinghong' ||
+           a.type==='duel' || a.type==='guohe' || a.type==='shunshou')) return;
   if(a && a.type==='yusuan') return;
   var L = SG.legal(G);
   if((c==='slash' || (c==='dodge' && SG.has(G.p[vi],'longdan'))) && L.slash){ SG.apply(G,{t:'slash'}); after(); return; }
@@ -1679,6 +1882,15 @@ function tapCard(i){
   }
   if(c==='wzsy'){ if(L.wzsy){ SG.apply(G,{t:'wzsy'}); after(); } return; }
   if(c==='nu'){ if(L.nu){ SG.apply(G,{t:'nu'}); after(); } return; }
+  if(c==='jiu'){
+    if(L.jiu){ SG.apply(G,{t:'jiu'}); after(); }
+    else if(G.jiuBoost > 0) flash('酒劲还在，下一刀已经 +1 了，第二碗白喝。');
+    else flash('这回合已经喝过一碗了。');
+    return;
+  }
+  if(c==='juedou'){ if(L.juedou){ SG.apply(G,{t:'juedou'}); after(); } return; }
+  if(c==='guohe'){ if(L.guohe){ SG.apply(G,{t:'guohe'}); after(); } return; }
+  if(c==='shunshou'){ if(L.shunshou){ SG.apply(G,{t:'shunshou'}); after(); } return; }
   if(SG.EQUIPS[c]){
     if(L.equip){ SG.apply(G,{t:'equip', idx:i}); after(); }
     else flash('现在是响应阶段，先把这一刀应付过去。');
@@ -1763,6 +1975,29 @@ function renderActs(){
       '<button onclick="act({t:\'qinglong\',use:false})">收刀</button>';
     return;
   }
+  if(a && a.type==='duel'){
+    var canDs = G.p[a.p].hand.indexOf('slash') >= 0 ||
+      (SG.has(G.p[a.p],'longdan') && G.p[a.p].hand.indexOf('dodge') >= 0) ||
+      (SG.has(G.p[a.p],'yonglie') && G.p[a.p].hand.indexOf('peach') >= 0);
+    box.innerHTML = '<span style="font-size:13px;">【决斗】战书已下，轮到 <b>' + G.p[a.p].name +
+      '</b> 出【杀】——接不上就要吃 1 点伤害（伤害来源是对手）。</span>' +
+      '<button class="pri"' + (canDs?'':' disabled') + ' onclick="act({t:\'duel\',use:true})">打出【杀】</button>' +
+      '<button onclick="act({t:\'duel\',use:false})">' + (canDs ? '接不上，认了' : '没有杀，认了') + '</button>';
+    return;
+  }
+  if(a && (a.type==='guohe' || a.type==='shunshou')){
+    var foeE = G.p[a.t].equip || {};
+    var verb = a.type==='guohe' ? '拆掉' : '夺来';
+    var bt = '';
+    if(foeE.weapon) bt += '<button class="pri" onclick="act({t:\'' + a.type + '\',slot:\'weapon\'})">' +
+      verb + '【' + CN[foeE.weapon] + '】</button>';
+    if(foeE.armor) bt += '<button class="pri" onclick="act({t:\'' + a.type + '\',slot:\'armor\'})">' +
+      verb + '【' + CN[foeE.armor] + '】</button>';
+    if(G.p[a.t].hand.length) bt += '<button onclick="act({t:\'' + a.type + '\',slot:\'hand\'})">' +
+      verb + '一张手牌（随机）</button>';
+    box.innerHTML = '<span style="font-size:13px;">要' + verb + ' ' + G.p[a.t].name + ' 的哪张牌？</span>' + bt;
+    return;
+  }
   if(a && a.type==='discard'){
     box.innerHTML = '<span style="font-size:13px;">弃牌阶段：手牌上限 ' + SG.maxHand(G,a.p) + '，需弃 ' + a.n + ' 张。</span>' +
       '<button class="pri"' + (sel.length===a.n?'':' disabled') + ' onclick="act({t:\'discard\',idxs:sel})">确定弃掉</button>';
@@ -1777,6 +2012,10 @@ function renderActs(){
     '<button' + (L.slash?' class="pri"':' disabled') + ' onclick="act({t:\'slash\'})">出【杀】</button>' +
     '<button' + (L.peach?'':' disabled') + ' onclick="act({t:\'peach\'})">吃【桃】</button>' +
     '<button' + (L.wzsy?'':' disabled') + ' onclick="act({t:\'wzsy\'})">无中生有</button>' +
+    '<button' + (L.jiu?'':' disabled') + ' onclick="act({t:\'jiu\'})">喝【酒】下一刀 +1</button>' +
+    '<button' + (L.juedou?'':' disabled') + ' onclick="act({t:\'juedou\'})">【决斗】</button>' +
+    '<button' + (L.guohe?'':' disabled') + ' onclick="act({t:\'guohe\'})">【过河拆桥】</button>' +
+    '<button' + (L.shunshou?'':' disabled') + ' onclick="act({t:\'shunshou\'})">【顺手牵羊】</button>' +
     '<button' + (L.nu?' class="pri"':' disabled') + ' onclick="act({t:\'nu\'})">诸葛连弩</button>' +
     (L.qimou ? '<button onclick="act({t:\'qimou\'})">【奇谋】弃1张→1点必中伤害</button>' : '') +
     (L.yehuo ? '<button onclick="act({t:\'yehuo\'})">【业火】弃2张→2点必中伤害</button>' : '') +
@@ -1964,6 +2203,7 @@ var VOICE_LINE = {
   '奇谋':'奇谋百出', '勇烈':'勇烈无双', '业火':'业火连天', '顾曲':'顾曲周郎',
   '凿险':'凿险偷渡', '阴平':'阴平小道', '少年志':'少年之志',
   '诸葛连弩':'连弩齐射',
+  '酒':'酒壮英雄胆', '决斗':'决一死战', '过河拆桥':'过河拆桥', '顺手牵羊':'顺手牵羊',
   '青釭剑':'青釭出鞘', '青龙偃月刀':'青龙偃月', '古锭刀':'古锭刀出',
   '八卦阵':'八卦阵起', '白银狮子':'白银狮子', '护心镜':'护心镜护体'
 };

@@ -16,7 +16,7 @@ let fail = 0;
 function ok(cond, msg) { if (!cond) { fail++; console.error('  ✗ ' + msg); } }
 
 const ids = SG.HEROES.map(h => h.id);
-const TOTAL = 64; // 杀28 + 闪12 + 桃8 + 无中6 + 诸葛连弩1 + 装备9
+const TOTAL = 75; // 杀28 + 闪12 + 桃8 + 无中6 + 战术11 + 诸葛连弩1 + 装备9
 let finished = 0, draws = 0, maxSteps = 0;
 const wins = {};
 
