@@ -274,10 +274,11 @@ def active_seat(state):
 # 等待态只接受对应动作；出牌阶段只接受出牌类动作（防止乱发把状态搞乱）
 AWAIT_ACTIONS = {
     "yusuan": {"yusuan"}, "keep": {"keep"}, "trim": {"trim"},
-    "jinglan": {"jinglan"}, "dodge": {"dodge"},
+    "jinglan": {"jinglan"}, "dodge": {"dodge", "bagua"}, "qinglong": {"qinglong"},
     "dying": {"dying"}, "save": {"save"}, "discard": {"discard"}, "jinghong": {"jinghong"},
 }
-PLAY_ACTIONS = {"slash", "peach", "wzsy", "nu", "ruiqi", "qimou", "lijian", "yehuo", "zhijian", "end"}
+PLAY_ACTIONS = {"slash", "peach", "wzsy", "nu", "ruiqi", "qimou", "lijian", "yehuo", "zhijian",
+                "equip", "end"}
 
 
 def check_move(state, move):

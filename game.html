@@ -58,7 +58,12 @@ button:disabled{opacity:.4;cursor:not-allowed;}
 .imeta{font-size:11px;color:#8a857a;margin-top:2px;}
 .iskill{font-size:11px;color:#6b665c;margin-top:4px;line-height:1.5;}
 .iskill b{color:#4a453a;font-weight:700;}
-.iskill .locked-tag{color:#8a857a;font-size:10px;}
+  .iskill .locked-tag{color:#8a857a;font-size:10px;}
+/* 装备区：一眼看清双方身上挂着什么 */
+.equips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
+.eq{font-size:10.5px;line-height:1.7;border:1px dashed #c9c3b4;border-radius:5px;
+  padding:0 6px;color:#a9a396;white-space:nowrap;}
+.eq.on{border-style:solid;border-color:#C9A227;background:#FBF3DB;color:#7a5a0a;font-weight:700;}
 /* 技能类型标签：锁定 / 触发 / 主动 —— 一眼看出这个技能什么时候生效 */
 .kind-tag{display:inline-block;font-size:9px;line-height:1.5;padding:0 4px;margin:0 3px;
   border-radius:3px;vertical-align:1px;font-weight:700;letter-spacing:.5px;}
@@ -128,6 +133,8 @@ button:disabled{opacity:.4;cursor:not-allowed;}
 .card:hover{transform:translateY(-2px);}
 .card.sel{border:2px solid #31597E;}
 .card.slash{color:#B03A2E;} .card.dodge{color:#2E5C8A;} .card.peach{color:#B84B6B;} .card.wzsy{color:#9A7B0A;} .card.nu{color:#6D4C9F;}
+.card.qinggang,.card.qinglong,.card.guding,.card.bagua,.card.shizi,.card.huxin{
+  color:#8A6D1F;background:#FDF8EA;border-color:#D8C48E;}
 .card small{display:block;font-size:10px;color:#8a857a;margin-top:2px;}
 .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
 .tip{font-size:12px;color:#8a4b2a;background:#FBEEE6;border-radius:8px;padding:6px 10px;margin-top:8px;}
@@ -202,7 +209,8 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
     <span class="mute" style="margin-right:10px;" onclick="toggleVoice()">🎙 语音：<span id="voiceTxt">开</span></span>
     <span class="mute" style="margin-right:10px;" onclick="toggleBgm()">🥁 战鼓：<span id="bgmTxt">关</span></span>
   </h1>
-  <p class="sub">简化规则：只有【杀】【闪】【桃】【无中生有】四种牌。每回合摸 2 张 → 出牌 → 手牌超过体力上限要弃。<br>
+  <p class="sub">简化规则：基本牌【杀】【闪】【桃】【无中生有】+ 神兵【诸葛连弩】+ 6 种装备。每回合摸 2 张 → 出牌 → 手牌超过体力上限要弃。<br>
+  装备：武器位、防具位各一格，装上就长期生效、不占手牌；同槽位装新的会替换旧的。<br>
   出杀次数：小将军 2 次、张飞 2 次、神姜维 3 次，其余武将 1 次；每回合只能吃 1 张【桃】。<br>
   <b style="color:#B03A2E;">濒死规则</b>：体力被打到 0 时不立即判负，而是进入濒死 —— 你可以打出一张【桃】救回自己（体力回到 1 点，濒死求桃不受"每回合 1 张"限制）；
   自己没有桃时，对手可以选择出桃相救。无人施救才真正阵亡。60 轮未分胜负判和。</p>
@@ -259,7 +267,27 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 <script id="engine">
 /* ========== 纯逻辑引擎（不碰 DOM，可被 Node 直接加载测试） ========== */
 var SG = (function(){
-  var CARDS = { slash:'杀', dodge:'闪', peach:'桃', wzsy:'无中生有', nu:'诸葛连弩' };
+  var CARDS = { slash:'杀', dodge:'闪', peach:'桃', wzsy:'无中生有', nu:'诸葛连弩',
+                qinggang:'青釭剑', qinglong:'青龙偃月刀', guding:'古锭刀',
+                bagua:'八卦阵', shizi:'白银狮子', huxin:'护心镜' };
+
+  /* ===== 装备牌 =====
+     武器位、防具位各一格，装上长期生效，不占手牌也不受手牌上限约束。
+     1v1 没有"距离"这个概念，所以武器不做攻击范围，改成各自独有的杀招特效。 */
+  var EQUIPS = {
+    qinggang:{ slot:'weapon', name:'青釭剑',
+      desc:'锁定技，你的【杀】无视对方的防具（八卦阵、白银狮子、护心镜全部失效）。' },
+    qinglong:{ slot:'weapon', name:'青龙偃月刀',
+      desc:'每回合限一次，你的【杀】被【闪】抵消后，你可以立即再使用一张【杀】（不占本回合出【杀】次数）。' },
+    guding:{ slot:'weapon', name:'古锭刀',
+      desc:'锁定技，当你使用【杀】时，若对方没有手牌，此【杀】伤害 +2。' },
+    bagua:{ slot:'armor', name:'八卦阵',
+      desc:'每当你需要出【闪】时，你可以改为判定：若为红色，视为你使用了一张【闪】。' },
+    shizi:{ slot:'armor', name:'白银狮子',
+      desc:'锁定技，你受到的【杀】伤害最多为 1 点（技能直伤不受影响）。' },
+    huxin:{ slot:'armor', name:'护心镜',
+      desc:'锁定技，当你进入濒死状态时，弃置此牌并将体力回复至 1 点（只能保一次命）。' }
+  };
 
   var HEROES = [
     { id:'boy', name:'小将军', faction:'shu', hp:4, power:9, handBonus:0, slashLimit:2,
@@ -323,12 +351,19 @@ var SG = (function(){
   function buildDeck(){
     var d = [];
     var i;
-    for(i=0;i<22;i++) d.push('slash');
-    for(i=0;i<10;i++) d.push('dodge');
-    for(i=0;i<6;i++) d.push('peach');
-    for(i=0;i<6;i++) d.push('wzsy');
+    for(i=0;i<28;i++) d.push('slash');
+    for(i=0;i<12;i++) d.push('dodge');
+    for(i=0;i<8;i++)  d.push('peach');
+    for(i=0;i<6;i++)  d.push('wzsy');
     d.push('nu');                       /* 诸葛连弩：全场仅一张，一次性神兵 */
-    return d;
+    /* 装备 9 张：武器 5（青釭 2 / 青龙 2 / 古锭 1）、防具 4（八卦 2 / 白银 1 / 护心镜 1） */
+    for(i=0;i<2;i++) d.push('qinggang');
+    for(i=0;i<2;i++) d.push('qinglong');
+    d.push('guding');
+    for(i=0;i<2;i++) d.push('bagua');
+    d.push('shizi');
+    d.push('huxin');
+    return d;                           /* 共 64 张 */
   }
 
   function shuffle(arr, rnd){
@@ -350,8 +385,10 @@ var SG = (function(){
       /* AI 难度：0 = 陪玩（会失误），1 = 标准（默认，行为与旧版完全一致），2 = 高手 */
       aiLevel: (opts.aiLevel === 0 ? 0 : (opts.aiLevel === 2 ? 2 : 1)),
       p: [
-        { idx:0, hero:h0, hp:h0.hp, maxHp:h0.hp, hand:[], used:{}, name:h0.name, dying:false },
-        { idx:1, hero:h1, hp:h1.hp, maxHp:h1.hp, hand:[], used:{}, name:h1.name, dying:false }
+        { idx:0, hero:h0, hp:h0.hp, maxHp:h0.hp, hand:[], used:{}, name:h0.name, dying:false,
+          equip:{ weapon:null, armor:null } },
+        { idx:1, hero:h1, hp:h1.hp, maxHp:h1.hp, hand:[], used:{}, name:h1.name, dying:false,
+          equip:{ weapon:null, armor:null } }
       ]
     };
     draw(st, 0, 4); draw(st, 1, 4);
@@ -412,6 +449,8 @@ var SG = (function(){
     st.p[p].used.kongcheng = false;
     st.p[p].used.yajiao = 0;
     st.p[p].used.yishiBonus = false;
+    st.p[p].used.qinglong = false;      /* 青龙偃月刀追砍每回合限一次 */
+    st.p[p].used.bagua = false;         /* 八卦阵每回合限一次 */
     if(has(st.p[p], 'yusuan')){
       st.awaiting = { p:p, type:'yusuan' };
       return;
@@ -480,6 +519,8 @@ var SG = (function(){
     out.yehuo = has(st.p[p], 'yehuo') && !st.p[p].used.yehuo && h.length >= 2;
     /* 借箭：不占本回合出刀次数，只受每回合一次的技能限制 */
     out.zhijian = has(st.p[p], 'jiejian') && !st.p[p].used.zhijian && h.length >= 1 && !oppBlocked;
+    /* 装备：手里有装备牌就能打进装备区（同槽位自动替换旧装备） */
+    out.equip = equipIdxOf(h, 'weapon') >= 0 || equipIdxOf(h, 'armor') >= 0;
     return out;
   }
 
@@ -487,6 +528,103 @@ var SG = (function(){
     var c = st.p[p].hand.splice(idx,1)[0];
     st.discard.push(c);
     return c;
+  }
+
+  /* ===== 装备 ===== */
+  function eqp(st, p){
+    var pl = st.p[p];
+    if(!pl.equip) pl.equip = { weapon:null, armor:null };   /* 兼容没有装备槽的旧状态 */
+    return pl.equip;
+  }
+  function equipIdxOf(h, slot){
+    for(var i=0;i<h.length;i++) if(EQUIPS[h[i]] && EQUIPS[h[i]].slot === slot) return i;
+    return -1;
+  }
+  /* AI 的装备偏好：八卦阵最泛用，青釭剑最能主动破局 */
+  function equipScore(id){
+    var s = { bagua:7, qinggang:6, qinglong:5, shizi:5, guding:4, huxin:4 };
+    return s[id] || 0;
+  }
+
+  /* 打进装备区：同槽位已有装备时旧装备直接进弃牌堆（不会累积起来） */
+  function doEquip(st, idx){
+    var p = st.turn, h = st.p[p].hand;
+    if(idx == null || idx < 0 || idx >= h.length) return;
+    var cid = h[idx], e = EQUIPS[cid];
+    if(!e) return;
+    var E = eqp(st, p), old = E[e.slot];
+    h.splice(idx, 1);                    /* 直接移到装备区，不进弃牌堆（否则会多算一张） */
+    E[e.slot] = cid;
+    if(old) st.discard.push(old);
+    st.events.push({ type:'card', p:p, name:e.name });
+    say(st, st.p[p].name + ' 装备【' + e.name + '】' +
+      (old ? '，替换下【' + EQUIPS[old].name + '】' : '') + '。', p);
+  }
+
+  /* ===== 判定 =====
+     翻一张"判定牌"只问颜色：红/黑由引擎随机给出，不消耗牌堆。
+     简化取舍：牌面本来没有花色属性，硬加会牵动全部索引逻辑；判定的乐趣在翻开的那一下。 */
+  var JUDGE_SUIT = ['♠','♥','♣','♦'];
+  function judge(st){
+    var s = Math.floor(st.rnd() * 4);
+    var n = 1 + Math.floor(st.rnd() * 13);
+    return { suit:JUDGE_SUIT[s], num:n, red:(s === 1 || s === 3), text:JUDGE_SUIT[s] + n };
+  }
+
+  /* 【八卦阵】：用判定代替出【闪】。判红视为出闪，判黑作废（之后还能改出真闪） */
+  function doBagua(st){
+    var a = st.awaiting;
+    if(!a || a.type !== 'dodge' || !a.canBagua) return;
+    st.p[a.p].used.bagua = true;          /* 本回合的八卦阵就用掉了，判黑也算 */
+    var j = judge(st);
+    st.events.push({ type:'judge', p:a.p });
+    say(st, st.p[a.p].name + ' 展开【八卦阵】判定：<b>' + j.text + '</b>' +
+      (j.red ? '（红色）' : '（黑色）'), a.p);
+    if(j.red){
+      say(st, '✨ 阵光流转，八卦自行运转，视为 ' + st.p[a.p].name + ' 使用了一张【闪】。', a.p);
+      st.awaiting = { p:a.p, type:'dodge', from:a.from, dmg:a.dmg, chain:a.chain,
+                      canDodge:a.canDodge, canBagua:false, need:a.need,
+                      noDodge:a.noDodge, noArmor:a.noArmor, note:a.note };
+      resolveDodge(st, true, true);          /* 第三参数：这张闪来自八卦阵，不扣手牌 */
+      return;
+    }
+    var canD = st.p[a.p].hand.indexOf('dodge') >= 0 ||
+               (has(st.p[a.p],'longdan') && st.p[a.p].hand.indexOf('slash') >= 0);
+    st.awaiting = { p:a.p, type:'dodge', from:a.from, dmg:a.dmg, chain:a.chain,
+                    canDodge:canD, canBagua:false, need:a.need, noDodge:a.noDodge,
+                    noArmor:a.noArmor, note:'【八卦阵】判定为黑色，没能挡住这一刀。' };
+  }
+
+  /* 一次【杀】被【闪】开之后：先看青龙偃月刀要不要追砍 */
+  function afterDodged(st){
+    var f = st.turn;                       /* 追砍的一定是本回合的出刀方 */
+    if(eqp(st,f).weapon !== 'qinglong' || st.p[f].used.qinglong) return false;
+    var canSlash = st.p[f].hand.indexOf('slash') >= 0 ||
+                   (has(st.p[f],'longdan') && st.p[f].hand.indexOf('dodge') >= 0);
+    if(!canSlash) return false;
+    st.awaiting = { p:f, type:'qinglong' };
+    return true;
+  }
+
+  function doQinglong(st, use){
+    var a = st.awaiting, p = a.p;
+    st.awaiting = null;
+    if(use){
+      st.p[p].used.qinglong = true;
+      st.events.push({ type:'skill', p:p, name:'青龙偃月刀' });
+      say(st, '🐉 ' + st.p[p].name + ' 刀势未收！【青龙偃月刀】龙吟一声，反手又是一刀。', p);
+      doSlash(st, false, true);            /* 不占本回合出刀次数 */
+      return;
+    }
+    afterAction(st);
+  }
+
+  /* 【胆烈】：体力掉到 1 时补两张（护心镜挡刀后回到 1 点也算） */
+  function tryDanlie(st, t){
+    if(!has(st.p[t],'danlie') || st.p[t].used.danlie || st.p[t].hp !== 1) return;
+    st.p[t].used.danlie = true;
+    draw(st, t, 2);
+    say(st, st.p[t].name + ' 胆大如斗！【胆烈】发动：摸 2 张牌。', t);
   }
 
   /* 【涯角】：龙胆转换牌后摸一张（每回合限两次） */
@@ -526,6 +664,14 @@ var SG = (function(){
     }
     if(!noCount) st.slashUsed++;
 
+    /* 【青釭剑】：这一刀穿透对方防具，八卦阵、白银狮子、护心镜全部失效 */
+    var noArmor = eqp(st, p).weapon === 'qinggang';
+    if(noArmor && eqp(st, t).armor){
+      st.events.push({ type:'skill', p:p, name:'青釭剑' });
+      say(st, st.p[p].name + ' 手握【青釭剑】，' + st.p[t].name + ' 的【' +
+          EQUIPS[eqp(st,t).armor].name + '】形同虚设！', p);
+    }
+
     var dmg = 1;
     if(has(st.p[p],'tieji')) dmg += 1;                                   /* 马超：恒定加重 */
     if(has(st.p[p],'mengli') && st.p[p].hp < st.p[p].maxHp && !st.p[p].used.mengli){
@@ -534,6 +680,12 @@ var SG = (function(){
     if(has(st.p[p],'kongcheng') && st.p[p].hand.length <= 1){
       dmg += 1;                                                         /* 诸葛亮：空手出刀更重 */
       say(st, st.p[p].name + ' 手中几乎无牌，【空城】反倒成了杀招，伤害 +1！', p);
+    }
+    /* 【古锭刀】：专治空手，对方没牌就是两倍的痛 */
+    if(eqp(st,p).weapon === 'guding' && st.p[t].hand.length === 0){
+      dmg += 2;
+      st.events.push({ type:'skill', p:p, name:'古锭刀' });
+      say(st, st.p[t].name + ' 手无寸牌，【古锭刀】一击见血，伤害 +2！', p);
     }
 
     /* 三种"闪不掉"，触发条件各不相同 */
@@ -550,10 +702,10 @@ var SG = (function(){
     }
     st.events.push({ type:'slash', p:p, dmg:dmg });
     say(st, st.p[p].name + ' 对 ' + st.p[1-p].name + ' 使用【杀】' + (dmg>1?'（伤害 +1）':'') + '。', p);
-    askDodge(st, 1-p, p, dmg, true, noDodge, note);
+    askDodge(st, 1-p, p, dmg, true, noDodge, note, noArmor);
   }
 
-  function askDodge(st, target, from, dmg, chain, noDodge, note){
+  function askDodge(st, target, from, dmg, chain, noDodge, note, noArmor){
     if(noDodge){
       st.events.push({ type:'skill', p:from });
       say(st, st.p[from].name + ' ' + note, from);
@@ -561,6 +713,9 @@ var SG = (function(){
     var need = has(st.p[from],'wushuang') ? 2 : 1;
     var hasDodge = !noDodge && (st.p[target].hand.indexOf('dodge') >= 0 ||
       (has(st.p[target],'longdan') && st.p[target].hand.indexOf('slash') >= 0));
+    /* 【八卦阵】：没闪也能赌一把判定；被青釭剑指着时用不了 */
+    var canBagua = !noDodge && !noArmor && eqp(st, target).armor === 'bagua' &&
+                   !st.p[target].used.bagua;
     var jl = false;
     if(has(st.p[target],'jinglan') && !st.p[target].used.jinglan && st.p[target].hand.length){
       jl = autoDropIdx(st.p[target].hand);
@@ -570,31 +725,35 @@ var SG = (function(){
       return;
     }
     st.awaiting = { p:target, type:'dodge', from:from, dmg:dmg, chain:chain,
-                    canDodge:hasDodge, need:need, noDodge:!!noDodge, note:note || '' };
+                    canDodge:hasDodge, canBagua:canBagua, need:need,
+                    noDodge:!!noDodge, noArmor:!!noArmor, note:note || '' };
   }
 
-  function resolveDodge(st, useDodge){
+  function resolveDodge(st, useDodge, viaBagua){
     var a = st.awaiting, t = a.p, f = a.from;
     /* 兜底：声称出闪但手里其实没有（或本就不能闪），按硬吃结算，绝不 splice(-1) */
-    if(useDodge && !a.canDodge) useDodge = false;
-    if(useDodge && st.p[t].hand.indexOf('dodge') < 0 &&
+    if(useDodge && !viaBagua && !a.canDodge) useDodge = false;
+    if(useDodge && !viaBagua && st.p[t].hand.indexOf('dodge') < 0 &&
        !(has(st.p[t],'longdan') && st.p[t].hand.indexOf('slash') >= 0)) useDodge = false;
     if(useDodge){
-      var i = st.p[t].hand.indexOf('dodge'), ghost = '';
-      if(i < 0 && has(st.p[t],'longdan')){
-        i = st.p[t].hand.indexOf('slash');
-        if(i >= 0) ghost = 'longdan';
-      }
-      discardCard(st, t, i);
-      if(ghost === 'longdan'){
-        say(st, st.p[t].name + ' 发动【龙胆】，把【杀】当【闪】来用。', t);
-        yajiao(st, t);
+      if(!viaBagua){                       /* 八卦阵的闪不扣手牌 */
+        var i = st.p[t].hand.indexOf('dodge'), ghost = '';
+        if(i < 0 && has(st.p[t],'longdan')){
+          i = st.p[t].hand.indexOf('slash');
+          if(i >= 0) ghost = 'longdan';
+        }
+        discardCard(st, t, i);
+        if(ghost === 'longdan'){
+          say(st, st.p[t].name + ' 发动【龙胆】，把【杀】当【闪】来用。', t);
+          yajiao(st, t);
+        }
       }
       st.events.push({ type:'dodge', p:t });
       if(a.need && a.need > 1){
         say(st, st.p[t].name + ' 使用【闪】挡下第一刀，但【无双】余威犹在，还需再出一张【闪】！', t);
         var can = st.p[t].hand.indexOf('dodge') >= 0 || (has(st.p[t],'longdan') && st.p[t].hand.indexOf('slash') >= 0);
-        st.awaiting = { p:t, type:'dodge', from:f, dmg:a.dmg, chain:a.chain, need:a.need-1, canDodge:can };
+        st.awaiting = { p:t, type:'dodge', from:f, dmg:a.dmg, chain:a.chain, need:a.need-1,
+                        canDodge:can, canBagua:a.canBagua, noArmor:a.noArmor };
         return;
       }
       say(st, st.p[t].name + ' 使用【闪】抵消了这次【杀】。', t);
@@ -615,6 +774,7 @@ var SG = (function(){
         st.awaiting = { p:t, type:'jinghong' };
         return;
       }
+      if(afterDodged(st)) return;          /* 青龙偃月刀：被闪开就追砍 */
       st.awaiting = null;
       afterAction(st);
       return;
@@ -625,7 +785,7 @@ var SG = (function(){
       hitDmg += 1;
       say(st, st.p[f].name + ' 的【无双】无人可挡，伤害 +1！', f);
     }
-    dealDamage(st, t, hitDmg, f);
+    dealDamage(st, t, hitDmg, f, a.noArmor, true);
     if(!st.over){
       if(has(st.p[f],'chuanyang')){
         draw(st, f, 1);
@@ -667,8 +827,10 @@ var SG = (function(){
       afterAction(st);
       return;
     }
+    var canJ = st.p[t].hand.indexOf('dodge') >= 0 ||
+               (has(st.p[t],'longdan') && st.p[t].hand.indexOf('slash') >= 0);
     st.awaiting = { p:t, type:'dodge', from:a.from, dmg:a.dmg, chain:a.chain,
-                    canDodge:st.p[t].hand.indexOf('dodge') >= 0 };
+                    canDodge:canJ, canBagua:a.canBagua, noArmor:a.noArmor };
   }
 
   function doJinghong(st, use){
@@ -684,10 +846,17 @@ var SG = (function(){
       return;
     }
     st.awaiting = null;
+    if(afterDodged(st)) return;
     afterAction(st);
   }
 
-  function dealDamage(st, t, n, from){
+  function dealDamage(st, t, n, from, noArmor, fromSlash){
+    /* 【白银狮子】：只卸【杀】的力道，技能直伤（奇谋 / 业火）照样打满 */
+    if(fromSlash && eqp(st,t).armor === 'shizi' && !noArmor && n > 1){
+      n = 1;
+      st.events.push({ type:'skill', p:t, name:'白银狮子' });
+      say(st, '🛡 ' + st.p[t].name + ' 的【白银狮子】卸去七分力道，伤害降为 1 点。', t);
+    }
     st.p[t].hp -= n;
     st.events.push({ type:'damage', p:t, n:n });
     say(st, st.p[t].name + ' 失去 ' + n + ' 点体力（剩余 ' + Math.max(0,st.p[t].hp) + '）。', t);
@@ -720,13 +889,21 @@ var SG = (function(){
       afterAction(st);
       return;
     }
-    if(has(st.p[t],'danlie') && !st.p[t].used.danlie && st.p[t].hp === 1){
-      st.p[t].used.danlie = true;
-      draw(st, t, 2);
-      say(st, st.p[t].name + ' 胆大如斗！【胆烈】发动：摸 2 张牌。', t);
-    }
+    if(st.p[t].hp === 1) tryDanlie(st, t);
     if(st.p[t].hp <= 0){
       st.p[t].hp = 0;
+      /* 【护心镜】：最后一道保命符，自动碎掉（青釭剑无视防具） */
+      if(eqp(st,t).armor === 'huxin' && !noArmor){
+        eqp(st,t).armor = null;
+        st.discard.push('huxin');
+        st.p[t].hp = 1;
+        st.p[t].dying = false;
+        st.events.push({ type:'skill', p:t, name:'护心镜' });
+        say(st, '🪞 ' + st.p[t].name + ' 胸前【护心镜】应声碎裂，硬生生挡下致命一击，体力回到 1 点！', t);
+        tryDanlie(st, t);
+        afterAction(st);
+        return;
+      }
       st.p[t].dying = true;
       st.events.push({ type:'dying', p:t });
       say(st, '⚠️ ' + st.p[t].name + ' 濒死！只有一张【桃】能救回性命。', t);
@@ -853,6 +1030,8 @@ var SG = (function(){
       var idx = h.indexOf(order[i]);
       if(idx >= 0) return idx;
     }
+    /* 兜底：先丢非装备牌，装备留着下回合还能装 */
+    for(var j=0;j<h.length;j++) if(!EQUIPS[h[j]]) return j;
     return 0;
   }
 
@@ -996,13 +1175,24 @@ var SG = (function(){
         if(lv === 0) use = hasDodge && st.p[p].hp <= a.dmg;                       /* 陪玩：只挡致命的 */
         else if(lv === 2) use = hasDodge && (st.p[p].hp <= a.dmg || st.p[p].hp <= 2 || worth >= 1);
         else use = hasDodge && (st.p[p].hp <= a.dmg || st.p[p].hp <= 2 || worth >= 2);
+        /* 有八卦阵就先赌判定：判红白赚一张闪，判黑还能再出真闪，没有损失 */
+        if(a.canBagua && (use || st.p[p].hp <= a.dmg + 1)) return { t:'bagua' };
         return { t:'dodge', use:use };
+      }
+      if(a.type==='qinglong'){
+        var foeQ = st.p[1-p], meQ = st.p[p];
+        var goQ = !(lv === 0 && st.rnd() < 0.4) &&
+                  (foeQ.hp <= 2 || meQ.hand.length >= 3 || foeQ.hand.length === 0);
+        return { t:'qinglong', use:goQ };
       }
       if(a.type==='jinghong') return { t:'jinghong', use: !(lv === 0 && st.rnd() < 0.5) };
       if(a.type==='discard'){
         var drop = [], prio = { wzsy:0, slash:2, nu:3, dodge:4, peach:6 };
         var arr = [];
-        for(var m=0;m<h.length;m++) arr.push({ i:m, v:prio[h[m]] });
+        for(var m=0;m<h.length;m++){
+          var pv = prio[h[m]];
+          arr.push({ i:m, v:(pv === undefined ? (EQUIPS[h[m]] ? 5 : 4) : pv) });
+        }
         arr.sort(function(x,y){ return x.v - y.v; });
         for(var q=0;q<a.n && q<arr.length;q++) drop.push(arr[q].i);
         return { t:'discard', idxs:drop };
@@ -1015,6 +1205,13 @@ var SG = (function(){
       if(L.slash) return { t:'slash' };
       return { t:'end' };
     }
+    /* 装备：空槽就装；已有装备时只在明显更强时才替换（别把好刀换掉） */
+    var E = eqp(st, p);
+    var aiW = equipIdxOf(hh, 'weapon'), aiA = equipIdxOf(hh, 'armor');
+    if(aiA >= 0 && (!E.armor || equipScore(hh[aiA]) > equipScore(E.armor) + 1))
+      return { t:'equip', idx:aiA };
+    if(aiW >= 0 && (!E.weapon || equipScore(hh[aiW]) > equipScore(E.weapon) + 1))
+      return { t:'equip', idx:aiW };
     if(lv === 2){
       /* 高手档：先算斩杀线——直伤够收人头就不赌出杀 */
       var foe = st.p[1-p];
@@ -1069,6 +1266,9 @@ var SG = (function(){
       case 'lijian': doLijian(st, mv.idx); break;
       case 'yehuo': doYehuo(st, mv.idxs); break;
       case 'zhijian': doZhijian(st, mv.idxs); break;
+      case 'equip': doEquip(st, mv.idx); break;
+      case 'bagua': doBagua(st); break;
+      case 'qinglong': doQinglong(st, mv.use); break;
       case 'end': endTurn(st); break;
     }
   }
@@ -1104,8 +1304,9 @@ var SG = (function(){
   }
 
   return {
-    CARDS:CARDS, HEROES:HEROES, newGame:newGame, legal:legal, apply:apply, aiStep:aiStep,
-    active:active, maxHand:maxHand, canAct:canAct, has:has
+    CARDS:CARDS, HEROES:HEROES, EQUIPS:EQUIPS, newGame:newGame, legal:legal, apply:apply,
+    aiStep:aiStep, active:active, maxHand:maxHand, canAct:canAct, has:has,
+    eqp:eqp, judge:judge
   };
 })();
 if (typeof module !== 'undefined') module.exports = SG;
@@ -1129,8 +1330,14 @@ function corner(h){
          '<span class="corner br ' + t.c + '"><span class="suit">' + t.s + '</span><span class="num">' + h.power + '</span></span>';
 }
 var FC = { wei:'#2E5C8A', shu:'#3B7A3B', wu:'#B03A2E', qun:'#9A7B0A', shen:'#6D4C9F', shi:'#C86A27' };
-var CN = { slash:'杀', dodge:'闪', peach:'桃', wzsy:'无中生有', nu:'诸葛连弩' };
-var DESC = { slash:'攻击对手，对方不出闪则掉血', dodge:'抵消一次杀', peach:'回复 1 点体力', wzsy:'立即摸 2 张牌', nu:'本回合出杀不限次数' };
+var CN = { slash:'杀', dodge:'闪', peach:'桃', wzsy:'无中生有', nu:'诸葛连弩',
+  qinggang:'青釭剑', qinglong:'青龙偃月刀', guding:'古锭刀',
+  bagua:'八卦阵', shizi:'白银狮子', huxin:'护心镜' };
+var DESC = { slash:'攻击对手，对方不出闪则掉血', dodge:'抵消一次杀', peach:'回复 1 点体力',
+  wzsy:'立即摸 2 张牌', nu:'本回合出杀不限次数',
+  qinggang:'你的杀无视对方防具', qinglong:'杀被闪掉可再补一刀',
+  guding:'对方空手时伤害 +2', bagua:'判定红色可当闪用',
+  shizi:'受到的杀伤害最多 1 点', huxin:'濒死时自动保命一次' };
 /* 技能类型标签文案 */
 var KINDS = { locked:'锁定', trigger:'触发', active:'主动' };
 
@@ -1207,6 +1414,16 @@ function backSetup(){
   G = null;
 }
 
+/* 装备区一行：武器 · 防具，空着就显示"空" */
+function eqRow(pl){
+  var E = pl.equip || {};
+  var mk = function(slot, label){
+    var id = E[slot];
+    return '<span class="eq' + (id ? ' on' : '') + '">' + label + ' · ' +
+      (id ? CN[id] : '空') + '</span>';
+  };
+  return '<div class="equips">' + mk('weapon', '🗡 武器') + mk('armor', '🛡 防具') + '</div>';
+}
 function face(pid){
   var pl = G.p[pid];
   var pips = '';
@@ -1224,6 +1441,7 @@ function face(pid){
         return '<b>【' + s.name + '】</b><span class="kind-tag ' + (s.kind || 'active') + '">' +
           (KINDS[s.kind] || '主动') + '</span>' + s.desc;
       }).join('<br>') + '</div>' +
+    eqRow(pl) +
     '</div>' +
     '<div class="handcnt">手牌 ' + pl.hand.length + '</div>' +
     '<div class="float" id="fl' + pid + '"></div>';
@@ -1366,6 +1584,7 @@ function render(){
     else if(ev.type === 'dodge'){ SFX.dodge(); speak('闪'); }
     else if(ev.type === 'heal'){ SFX.heal(); speak('桃'); }
     else if(ev.type === 'draw') SFX.draw();
+    else if(ev.type === 'judge') SFX.judge();
     else if(ev.type === 'skill'){ SFX.skill(); if(ev.name) speak(ev.name); }
     else if(ev.type === 'card'){ speak(ev.name); }
     else if(ev.type === 'dying'){ SFX.dying(); if(ev.p === 0) buzz([180, 80, 180]); speak('求桃'); }
@@ -1460,6 +1679,11 @@ function tapCard(i){
   }
   if(c==='wzsy'){ if(L.wzsy){ SG.apply(G,{t:'wzsy'}); after(); } return; }
   if(c==='nu'){ if(L.nu){ SG.apply(G,{t:'nu'}); after(); } return; }
+  if(SG.EQUIPS[c]){
+    if(L.equip){ SG.apply(G,{t:'equip', idx:i}); after(); }
+    else flash('现在是响应阶段，先把这一刀应付过去。');
+    return;
+  }
 }
 
 function flash(msg){
@@ -1521,15 +1745,22 @@ function renderActs(){
     box.innerHTML = '<span style="font-size:13px;">被【杀】了，伤害 ' + a.dmg + ' 点。' +
       (a.note ? '<b style="color:#B03A2E;">' + a.note + '</b>' : '') +
       (a.need > 1 ? '<b style="color:#B03A2E;">【无双】需要出两张闪！</b>' : '') + '</span>' +
-      (a.canDodge ? '<button class="pri" onclick="act({t:\'dodge\',use:true})">出【闪】</button>' +
+      (a.canBagua ? '<button class="pri" onclick="act({t:\'bagua\'})">🔮 八卦阵判定</button>' : '') +
+      (a.canDodge ? '<button' + (a.canBagua ? '' : ' class="pri"') + ' onclick="act({t:\'dodge\',use:true})">出【闪】</button>' +
         '<button onclick="act({t:\'dodge\',use:false})">硬吃这一下</button>'
-      : '<button class="pri" onclick="act({t:\'dodge\',use:false})">' + (a.noDodge ? '硬吃 ' : '没有闪，硬吃 ') + a.dmg + ' 点</button>');
+      : '<button' + (a.canBagua ? '' : ' class="pri"') + ' onclick="act({t:\'dodge\',use:false})">' + (a.noDodge ? '硬吃 ' : '没有闪，硬吃 ') + a.dmg + ' 点</button>');
     return;
   }
   if(a && a.type==='jinghong'){
     box.innerHTML = '<span style="font-size:13px;">【惊鸿】：可以反手一箭，对对方造成 1 点伤害。</span>' +
       '<button class="pri" onclick="act({t:\'jinghong\',use:true})">发动惊鸿</button>' +
       '<button onclick="act({t:\'jinghong\',use:false})">算了</button>';
+    return;
+  }
+  if(a && a.type==='qinglong'){
+    box.innerHTML = '<span style="font-size:13px;">【青龙偃月刀】刀势未尽：这一刀被闪开了，可以立刻再追一刀（不占本回合出刀次数）。</span>' +
+      '<button class="pri" onclick="act({t:\'qinglong\',use:true})">🐉 追砍一刀</button>' +
+      '<button onclick="act({t:\'qinglong\',use:false})">收刀</button>';
     return;
   }
   if(a && a.type==='discard'){
@@ -1675,6 +1906,9 @@ var SFX = {
   heal:  function(){ tone({ f:523, type:'triangle', dur:0.16, vol:0.11 });
                      tone({ f:784, type:'sine', dur:0.22, vol:0.09, delay:0.08 }); },
   skill: function(){ [392,523,659].forEach(function(f,i){ tone({ f:f, type:'triangle', dur:0.14, vol:0.11, delay:i*0.085 }); }); },
+  /* 判定：一张牌"啪"地翻开的干脆声，泛音上扬 */
+  judge: function(){ noise({ freq:2300, dur:0.07, vol:0.10 });
+                     tone({ f:820, to:1240, type:'sine', dur:0.11, vol:0.08, delay:0.05 }); },
   dying: function(){ tone({ f:120, to:70, type:'sawtooth', dur:0.7, vol:0.16 });
                      tone({ f:180, to:110, type:'square', dur:0.55, vol:0.10, delay:0.10 });
                      noise({ freq:180, dur:0.5, vol:0.10 }); },
@@ -1729,7 +1963,9 @@ var VOICE_LINE = {
   '西凉':'西凉铁骑', '九伐':'九伐中原', '继志':'继承遗志', '胆烈':'胆大如斗',
   '奇谋':'奇谋百出', '勇烈':'勇烈无双', '业火':'业火连天', '顾曲':'顾曲周郎',
   '凿险':'凿险偷渡', '阴平':'阴平小道', '少年志':'少年之志',
-  '诸葛连弩':'连弩齐射'
+  '诸葛连弩':'连弩齐射',
+  '青釭剑':'青釭出鞘', '青龙偃月刀':'青龙偃月', '古锭刀':'古锭刀出',
+  '八卦阵':'八卦阵起', '白银狮子':'白银狮子', '护心镜':'护心镜护体'
 };
 function speak(text){
   if(!voiceOn || !text) return;

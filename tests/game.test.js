@@ -16,7 +16,7 @@ let fail = 0;
 function ok(cond, msg) { if (!cond) { fail++; console.error('  ✗ ' + msg); } }
 
 const ids = SG.HEROES.map(h => h.id);
-const TOTAL = 45; // 杀22 + 闪10 + 桃6 + 无中6 + 诸葛连弩1
+const TOTAL = 64; // 杀28 + 闪12 + 桃8 + 无中6 + 诸葛连弩1 + 装备9
 let finished = 0, draws = 0, maxSteps = 0;
 const wins = {};
 
@@ -28,8 +28,11 @@ for (let g = 0; g < 400; g++) {
   let steps = 0;
 
   while (!st.over && steps < 4000) {
-    // 牌数守恒
-    const all = st.deck.length + st.discard.length + st.p[0].hand.length + st.p[1].hand.length;
+    // 牌数守恒（装备牌在装备区，不能漏算）
+    const eqn = ['weapon', 'armor'].reduce((n, slot) =>
+      n + (st.p[0].equip && st.p[0].equip[slot] ? 1 : 0)
+        + (st.p[1].equip && st.p[1].equip[slot] ? 1 : 0), 0);
+    const all = st.deck.length + st.discard.length + st.p[0].hand.length + st.p[1].hand.length + eqn;
     ok(all === TOTAL, `牌总数不守恒: ${all}`);
     ok(st.p[0].hp <= st.p[0].maxHp && st.p[1].hp <= st.p[1].maxHp, '体力超过上限');
     ok(st.p[0].hand.length <= st.p[0].maxHp + 12, '手牌异常膨胀');

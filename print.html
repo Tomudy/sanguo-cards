@@ -33,7 +33,17 @@
   .card.wei{--fc:var(--wei);} .card.shu{--fc:var(--shu);} .card.wu{--fc:var(--wu);} .card.qun{--fc:var(--qun);}
   .card.shen{--fc:var(--shen);}
   .card.shi{--fc:var(--shi);}
-  .card.shen .foot::before{content:"★ ";color:var(--fc);}
+  .card.eq{--fc:#9A7B0A;}
+.card.eq .head{align-items:baseline;}
+.card.eq .slotTag{font-size:6.5pt;color:#9a9384;letter-spacing:.3mm;}
+.eqart{flex:none;height:36mm;border:0.5mm solid var(--fc);border-radius:2mm;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5mm;
+  background:linear-gradient(160deg,#FBF3DB,#F1E4C2);}
+.eqart .glyph{font-family:"KaiTi","STKaiti","SimSun",serif;font-size:30pt;color:var(--fc);line-height:1;}
+.eqart .sub{font-size:6.5pt;letter-spacing:1mm;color:#8a7a4a;}
+.eqtext{flex:1;padding:2.2mm 1mm 0;font-size:7.8pt;line-height:1.65;}
+.eqtext b{color:var(--fc);font-size:8.4pt;}
+.card.shen .foot::before{content:"★ ";color:var(--fc);}
   .card.shi .foot::before{content:"◆ ";color:var(--fc);}
   .head{height:9mm;display:flex;align-items:center;justify-content:space-between;flex:none;}
   .name{font-family:"KaiTi","STKaiti","SimSun",serif;font-weight:700;font-size:13.5pt;color:var(--fc);
@@ -75,7 +85,8 @@
   <h1>三国武将卡 · 亲子打印版</h1>
   <p>规格：63mm × 88mm（标准卡牌尺寸），A4 每页 9 张，按虚线裁剪后套磨砂卡套即可上场。</p>
   <p class="hint">加新卡：在下方 &lt;script&gt; 里的 CARDS 数组照格式加一条，刷新页面即可；把「小将军 ·（写下你的名字）」改成孩子的名字。打印时勾选「背景图形」。</p>
-  <p class="hint"><b>实体卡玩法规则</b>：只有【杀】【闪】【桃】【无中生有】四种牌，每回合摸 2 张 → 出牌 → 弃到体力上限；
+  <p class="hint"><b>实体卡玩法规则</b>：基本牌【杀】【闪】【桃】【无中生有】+ 神兵【诸葛连弩】+ 6 种装备，每回合摸 2 张 → 出牌 → 弃到体力上限；
+  装备打进「武器位 / 防具位」，装上长期生效、不占手牌，同槽位装新的会替换旧的；
   每回合只能出 1 次杀（小将军、张飞 2 次，神姜维 3 次）、吃 1 张桃。<b style="color:#B03A2E;">体力打到 0 进入濒死</b>：
   打出 1 张【桃】可自救回 1 点体力，自己没桃时对手可以出桃相救，无人施救才阵亡。</p>
   <button onclick="window.print()">打印 / 导出 PDF</button>
@@ -224,8 +235,29 @@ function orbs(n){
   return '<span class="orbs">'+s+'</span>';
 }
 
-document.getElementById('sheet').innerHTML = CARDS.map(c =>
-  '<div class="card '+c.faction+'">'+
+/* ===== 装备牌 ===== 武器位 / 防具位各一格，装上长期生效，不占手牌 */
+CARDS.push(
+  { type:"equip", name:"青釭剑", slot:"武器", glyph:"剑", copies:2,
+    text:"锁定技，你的【杀】无视对方的防具（八卦阵、白银狮子、护心镜全部失效）。" },
+  { type:"equip", name:"青龙偃月刀", slot:"武器", glyph:"刀", copies:2,
+    text:"每回合限一次，你的【杀】被【闪】抵消后，你可以立即再使用一张【杀】（不占本回合出【杀】次数）。" },
+  { type:"equip", name:"古锭刀", slot:"武器", glyph:"刀", copies:1,
+    text:"锁定技，当你使用【杀】时，若对方没有手牌，此【杀】伤害 +2。" },
+  { type:"equip", name:"八卦阵", slot:"防具", glyph:"卦", copies:2,
+    text:"每回合限一次，当你需要出【闪】时，你可以改为判定：若为红色，视为你使用了一张【闪】。" },
+  { type:"equip", name:"白银狮子", slot:"防具", glyph:"狮", copies:1,
+    text:"锁定技，你受到的【杀】伤害最多为 1 点（技能直伤不受影响）。" },
+  { type:"equip", name:"护心镜", slot:"防具", glyph:"镜", copies:1,
+    text:"锁定技，当你进入濒死状态时，弃置此牌并将体力回复至 1 点（只能保一次命）。" }
+);
+
+/* 装备牌按 copies 展开成多张实体卡 */
+const EXP = [];
+CARDS.forEach(c => { for (let i = 0; i < (c.copies || 1); i++) EXP.push(c); });
+
+/* 武将卡与装备卡两种版式 */
+function heroCard(c){
+  return '<div class="card '+c.faction+'">'+
     pcorner(c)+
     '<div class="head"><span class="name">'+c.name+'</span>'+orbs(c.hp)+'</div>'+
     '<div class="art"><img src="'+c.art+'" alt=""></div>'+
@@ -237,8 +269,19 @@ document.getElementById('sheet').innerHTML = CARDS.map(c =>
     '</div>'+
     '<div class="quote">「'+c.quote+'」</div>'+
     '<div class="foot">原创武将 · 家庭自用</div>'+
-  '</div>'
-).join('');
+  '</div>';
+}
+function equipCard(c){
+  return '<div class="card eq">'+
+    '<div class="head"><span class="name">'+c.name+'</span><span class="slotTag">'+c.slot+'</span></div>'+
+    '<div class="eqart"><span class="glyph">'+c.glyph+'</span><span class="sub">'+c.slot+'牌</span></div>'+
+    '<div class="eqtext"><b>'+c.name+'</b><br>'+c.text+'</div>'+
+    '<div class="foot">装备牌 · 家庭自用</div>'+
+  '</div>';
+}
+
+document.getElementById('sheet').innerHTML =
+  EXP.map(c => c.type === 'equip' ? equipCard(c) : heroCard(c)).join('');
 </script>
 </body>
 </html>
