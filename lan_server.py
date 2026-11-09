@@ -277,9 +277,10 @@ AWAIT_ACTIONS = {
     "jinglan": {"jinglan"}, "dodge": {"dodge", "bagua"}, "qinglong": {"qinglong"},
     "dying": {"dying"}, "save": {"save"}, "discard": {"discard"}, "jinghong": {"jinghong"},
     "duel": {"duel"}, "guohe": {"guohe"}, "shunshou": {"shunshou"},
+    "wuxie": {"wuxie"}, "nanman": {"nanman"}, "wanjian": {"wanjian"},
 }
 PLAY_ACTIONS = {"slash", "peach", "wzsy", "nu", "ruiqi", "qimou", "lijian", "yehuo", "zhijian",
-                "jiu", "juedou", "guohe", "shunshou", "equip", "end"}
+                "jiu", "juedou", "guohe", "shunshou", "nanman", "wanjian", "equip", "end"}
 
 
 def check_move(state, move):

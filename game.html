@@ -136,6 +136,12 @@ button:disabled{opacity:.4;cursor:not-allowed;}
   color:#31597E;text-shadow:0 2px 12px rgba(255,255,255,.95),0 0 2px #fff;
   opacity:0;pointer-events:none;z-index:60;}
 .banner.go{animation:bannerGo 1.4s ease forwards;}
+.pz{border:1px solid #d8d2c4;border-radius:10px;padding:10px 14px;margin:8px 0;cursor:pointer;background:#fff;}
+.pz:hover{border-color:#31597E;}
+.pz b{display:block;font-size:14px;margin-bottom:2px;}
+.pz span{font-size:12px;color:#6b665c;}
+.pz em{float:right;font-style:normal;font-size:12px;color:#3B7A3B;}
+.pz.locked{opacity:.55;cursor:not-allowed;background:#f3f0e9;}
 @keyframes bannerGo{
   0%{opacity:0;transform:scale(.6);}
   18%{opacity:1;transform:scale(1.08);}
@@ -151,6 +157,9 @@ button:disabled{opacity:.4;cursor:not-allowed;}
 .card.jiu{color:#9A5B1E;background:#FDF4E8;border-color:#E0C7A8;}
 .card.juedou{color:#8A2F28;background:#FCEFEC;border-color:#E5BDB6;}
 .card.guohe,.card.shunshou{color:#2F6A4F;background:#EEF7F1;border-color:#B8D8C5;}
+.card.nanman{color:#6B4A2B;background:#F7F0E4;border-color:#D9C7A8;}
+.card.wanjian{color:#3E5C76;background:#EDF2F7;border-color:#BCCCDD;}
+.card.wuxie{color:#55507A;background:#F1F0F8;border-color:#C9C6E0;}
 .card small{display:block;font-size:10px;color:#8a857a;margin-top:2px;}
 .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
 .tip{font-size:12px;color:#8a4b2a;background:#FBEEE6;border-radius:8px;padding:6px 10px;margin-top:8px;}
@@ -255,6 +264,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
         <select id="foeSel" style="font-size:13px;padding:4px 6px;border-radius:6px;border:1px solid #c3beb0;max-width:150px;"></select>
       </span>
       <button class="pri" onclick="startGame()">开始对战</button>
+      <button onclick="showPuzzles()">🧩 闯关</button>
       <button onclick="showStats()">🏆 战绩</button>
     </div>
   </div>
@@ -277,9 +287,23 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 <div class="ov" id="ov"><div class="ovbox">
   <h2 id="ovTitle"></h2><p id="ovText"></p>
   <div id="ovAch"></div>
-  <button class="pri" onclick="rematch(true)">再战一局</button>
-  <button onclick="rematch(false)">换个对手</button>
-  <button onclick="quitToSetup()">返回选将</button>
+  <div id="ovBtnsNormal">
+    <button class="pri" onclick="rematch(true)">再战一局</button>
+    <button onclick="rematch(false)">换个对手</button>
+    <button onclick="quitToSetup()">返回选将</button>
+  </div>
+  <div id="ovBtnsPuzzle" style="display:none;">
+    <button class="pri" id="ovBtnNext" onclick="nextPuzzle()">下一关</button>
+    <button onclick="retryPuzzle()">重试本关</button>
+    <button onclick="quitPuzzle()">返回选将</button>
+  </div>
+</div></div>
+
+<div class="ov" id="puzzleOv"><div class="ovbox" style="max-width:560px;max-height:82vh;overflow-y:auto;text-align:left;">
+  <h2 style="text-align:center;">🧩 残局闯关</h2>
+  <p style="text-align:center;">每关都是一个精心布置的残局：用手里的牌，一局之内赢下对手！</p>
+  <div id="puzzleBody"></div>
+  <div style="text-align:center;margin-top:12px;"><button class="pri" onclick="closePuzzles()">关闭</button></div>
 </div></div>
 
 <div class="ov" id="cardOv"><div class="ovbox" style="max-width:340px;">
@@ -300,6 +324,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 var SG = (function(){
   var CARDS = { slash:'杀', dodge:'闪', peach:'桃', wzsy:'无中生有', nu:'诸葛连弩',
                 jiu:'酒', juedou:'决斗', guohe:'过河拆桥', shunshou:'顺手牵羊',
+                nanman:'南蛮入侵', wanjian:'万箭齐发', wuxie:'无懈可击',
                 qinggang:'青釭剑', qinglong:'青龙偃月刀', guding:'古锭刀',
                 bagua:'八卦阵', shizi:'白银狮子', huxin:'护心镜' };
 
@@ -330,7 +355,7 @@ var SG = (function(){
               {id:'jinglan',name:'静澜',kind:'trigger',desc:'每回合限一次，当你成为【杀】的目标时，你可以弃置一张手牌，令此【杀】无效（包括不可被【闪】抵消的杀），然后摸一张牌。'}] },
     { id:'qingluan', name:'青鸾', faction:'wu', hp:3, power:6, handBonus:0, slashLimit:1,
       skills:[{id:'chuanyang',name:'穿杨',kind:'locked',desc:'锁定技，当你的【杀】造成伤害后，你摸一张牌。'},
-              {id:'jinghong',name:'惊鸿',kind:'trigger',desc:'当你使用【闪】抵消【杀】后，你可以对使用者造成 1 点伤害，然后摸一张牌。'}] },
+              {id:'jinghong',name:'惊鸿',kind:'trigger',desc:'当你使用【闪】抵消【杀】或【万箭齐发】后，你可以对使用者造成 1 点伤害，然后摸一张牌。'}] },
     { id:'gushan', name:'虎痴·关山', faction:'qun', hp:5, power:8, handBonus:0, slashLimit:1,
       skills:[{id:'mengli',name:'猛力',kind:'locked',desc:'锁定技，每回合限一次，当你已受伤时，你的【杀】伤害 +1。'},
               {id:'douzhi',name:'斗志',kind:'locked',desc:'锁定技，当你受到伤害后，你摸一张牌。'}] },
@@ -393,6 +418,10 @@ var SG = (function(){
     for(i=0;i<3;i++) d.push('juedou');
     for(i=0;i<3;i++) d.push('guohe');
     for(i=0;i<2;i++) d.push('shunshou');
+    /* 群体锦囊与反制 5 张：南蛮 2 / 万箭 1 / 无懈可击 2 */
+    for(i=0;i<2;i++) d.push('nanman');
+    d.push('wanjian');
+    for(i=0;i<2;i++) d.push('wuxie');
     /* 装备 9 张：武器 5（青釭 2 / 青龙 2 / 古锭 1）、防具 4（八卦 2 / 白银 1 / 护心镜 1） */
     for(i=0;i<2;i++) d.push('qinggang');
     for(i=0;i<2;i++) d.push('qinglong');
@@ -400,7 +429,7 @@ var SG = (function(){
     for(i=0;i<2;i++) d.push('bagua');
     d.push('shizi');
     d.push('huxin');
-    return d;                           /* 共 75 张 */
+    return d;                           /* 共 80 张 */
   }
 
   function shuffle(arr, rnd){
@@ -538,7 +567,8 @@ var SG = (function(){
 
   function legal(st){
     var out = { slash:false, peach:false, wzsy:false, nu:false, ruiqi:false, end:true,
-                jiu:false, juedou:false, guohe:false, shunshou:false };
+                jiu:false, juedou:false, guohe:false, shunshou:false,
+                nanman:false, wanjian:false };
     if(!canAct(st)) return out;
     var p = st.turn, h = st.p[p].hand;
     var opp = 1 - p, oppBlocked = false;
@@ -568,6 +598,10 @@ var SG = (function(){
     var foeHas = !!(st.p[opp].hand.length > 0 || eqp(st,opp).weapon || eqp(st,opp).armor);
     out.guohe = h.indexOf('guohe') >= 0 && foeHas;
     out.shunshou = h.indexOf('shunshou') >= 0 && foeHas;
+    /* 南蛮 / 万箭：群体锦囊压成 1v1 的"强制响应"，对方总能成为目标 */
+    out.nanman = h.indexOf('nanman') >= 0;
+    out.wanjian = h.indexOf('wanjian') >= 0;
+    /* 无懈可击是响应牌，轮到你出牌时不能主动打 */
     /* 装备：手里有装备牌就能打进装备区（同槽位自动替换旧装备） */
     out.equip = equipIdxOf(h, 'weapon') >= 0 || equipIdxOf(h, 'armor') >= 0;
     return out;
@@ -903,7 +937,7 @@ var SG = (function(){
       return;
     }
     st.awaiting = null;
-    if(afterDodged(st)) return;
+    if(!a.nm && afterDodged(st)) return;   /* 万箭场景没有"杀被闪"，不触发青龙刀 */
     afterAction(st);
   }
 
@@ -1081,15 +1115,123 @@ var SG = (function(){
     return { i:i, ghost:ghost };
   }
 
-  /* 【决斗】：目标先出【杀】，双方轮流接，谁先接不上谁吃 1 点伤害（来源是对手） */
-  function doJuedou(st){
-    var p = st.turn, t = 1-p, i = st.p[p].hand.indexOf('juedou');
+  /* ===== 锦囊统一入口与【无懈可击】连锁 =====
+     决斗 / 过河拆桥 / 顺手牵羊 / 南蛮入侵 / 万箭齐发 五种"对人锦囊"打出后，
+     只要双方任一人手里有无懈可击，就先进入无懈询问：目标可以无懈，
+     发起方还可以再反无懈，连锁层数为奇 → 锦囊被抵消，为偶 → 照常结算。
+     双方都没无懈时跳过询问直接结算（流程与旧版完全一致）。 */
+  function doTrick(st, kind){
+    var p = st.turn, t = 1-p, i = st.p[p].hand.indexOf(kind);
     if(i < 0) return;
     discardCard(st, p, i);
-    st.events.push({ type:'card', p:p, name:'决斗' });
-    say(st, '⚔️ ' + st.p[p].name + ' 掷下【决斗】战书，' + st.p[t].name + ' 必须先出【杀】！', p);
-    st.awaiting = { p:t, type:'duel', foe:p };
+    st.events.push({ type:'card', p:p, name:CARDS[kind] });
+    say(st, TRICK_SAY[kind](st, p, t), p);
+    if(st.p[0].hand.indexOf('wuxie') >= 0 || st.p[1].hand.indexOf('wuxie') >= 0){
+      st.awaiting = { p:t, type:'wuxie', trick:kind, from:p, count:0 };
+      return;
+    }
+    resolveTrick(st, kind, p, t);
   }
+  var TRICK_SAY = {
+    juedou:  function(st,p,t){ return '⚔️ ' + st.p[p].name + ' 掷下【决斗】战书，' + st.p[t].name + ' 必须先出【杀】！'; },
+    guohe:   function(st,p,t){ return '🌉 ' + st.p[p].name + ' 使用【过河拆桥】，要动 ' + st.p[t].name + ' 的一张牌。'; },
+    shunshou:function(st,p,t){ return '🐑 ' + st.p[p].name + ' 使用【顺手牵羊】，盯上了 ' + st.p[t].name + ' 的牌。'; },
+    nanman:  function(st,p,t){ return '🐘 ' + st.p[p].name + ' 放出【南蛮入侵】，' + st.p[t].name + ' 必须打出一张【杀】，否则掉 1 血！'; },
+    wanjian: function(st,p,t){ return '🏹 ' + st.p[p].name + ' 下令【万箭齐发】，' + st.p[t].name + ' 必须打出一张【闪】，否则掉 1 血！'; }
+  };
+
+  /* 锦囊真正生效（无懈连锁走完且没被抵消） */
+  function resolveTrick(st, kind, from, t){
+    if(kind === 'juedou'){ st.awaiting = { p:t, type:'duel', foe:from }; return; }
+    if(kind === 'guohe' || kind === 'shunshou'){ st.awaiting = { p:from, type:kind, t:t }; return; }
+    if(kind === 'nanman'){ st.awaiting = { p:t, type:'nanman', from:from }; return; }
+    if(kind === 'wanjian'){ st.awaiting = { p:t, type:'wanjian', from:from }; return; }
+  }
+
+  /* 无懈连锁的一次响应：use=true 打出一张无懈（奇偶翻转），use=false 连锁终结 */
+  function resolveWuxie(st, use){
+    var a = st.awaiting, p = a.p;
+    if(use){
+      var i = st.p[p].hand.indexOf('wuxie');
+      if(i >= 0){
+        discardCard(st, p, i);
+        a.count++;
+        st.events.push({ type:'card', p:p, name:'无懈可击' });
+        say(st, '🚫 ' + st.p[p].name + ' 打出【无懈可击】' +
+          (a.count % 2 === 1 ? '，要抵消【' + CARDS[a.trick] + '】！'
+                             : '，反无懈！【' + CARDS[a.trick] + '】重新生效！'), p);
+        /* 对方手里还有无懈就把球踢回去；没有则连锁到此为止 */
+        if(st.p[1-p].hand.indexOf('wuxie') >= 0){ a.p = 1-p; return; }
+        finishWuxie(st, a);
+        return;
+      }
+    }
+    finishWuxie(st, a);
+  }
+  function finishWuxie(st, a){
+    st.awaiting = null;
+    if(a.count % 2 === 1){
+      say(st, '【' + CARDS[a.trick] + '】被无懈可击抵消，烟消云散了。', a.from);
+      afterAction(st);
+      return;
+    }
+    resolveTrick(st, a.trick, a.from, 1 - a.from);
+  }
+
+  /* 【南蛮入侵】：打出一张【杀】响应（龙胆 / 勇烈可转换），否则吃 1 点伤害 */
+  function resolveNanman(st, use){
+    var a = st.awaiting, p = a.p;
+    var pick = use ? slashIdxIn(st.p[p].hand, st.p[p]) : { i:-1 };
+    st.awaiting = null;
+    if(pick.i >= 0){
+      discardCard(st, p, pick.i);
+      if(pick.ghost === 'longdan'){
+        say(st, st.p[p].name + ' 发动【龙胆】，把【闪】当【杀】杀退南蛮。', p);
+        yajiao(st, p);
+      } else if(pick.ghost === 'yonglie'){
+        say(st, st.p[p].name + ' 【勇烈】把【桃】当【杀】打出，杀退南蛮！', p);
+      } else {
+        say(st, st.p[p].name + ' 打出一张【杀】，杀退南蛮。', p);
+      }
+      afterAction(st);
+      return;
+    }
+    say(st, '🐘 南蛮践踏！' + st.p[p].name + ' 没能打出【杀】。', p);
+    dealDamage(st, p, 1, a.from);
+    if(!st.over && !st.awaiting) afterAction(st);
+  }
+
+  /* 【万箭齐发】：打出一张【闪】响应（龙胆可把杀当闪），否则吃 1 点伤害 */
+  function resolveWanjian(st, use){
+    var a = st.awaiting, p = a.p, h = st.p[p].hand, i = -1, ghost = '';
+    if(use){
+      i = h.indexOf('dodge');
+      if(i < 0 && has(st.p[p],'longdan')){ i = h.indexOf('slash'); if(i >= 0) ghost = 'longdan'; }
+    }
+    st.awaiting = null;
+    if(i >= 0){
+      discardCard(st, p, i);
+      if(ghost === 'longdan')
+        say(st, st.p[p].name + ' 发动【龙胆】，把【杀】当【闪】拨开箭雨。', p);
+      else{
+        say(st, st.p[p].name + ' 打出一张【闪】，拨开箭雨。', p);
+        yajiao(st, p);              /* 涯角：真打出闪要摸牌 */
+      }
+      /* 惊鸿：箭雨也是攻势，闪开了就能反手一箭 */
+      if(has(st.p[p],'jinghong') && !st.p[p].used.jinghong){
+        st.awaiting = { p:p, type:'jinghong', nm:1 };
+        return;
+      }
+      afterAction(st);
+      return;
+    }
+    say(st, '🏹 万箭穿空！' + st.p[p].name + ' 没能打出【闪】。', p);
+    dealDamage(st, p, 1, a.from);
+    if(!st.over && !st.awaiting) afterAction(st);
+  }
+
+  /* 【决斗】：目标先出【杀】，双方轮流接，谁先接不上谁吃 1 点伤害（来源是对手） */
+  function doJuedou(st){ doTrick(st, 'juedou'); }
 
   function resolveDuel(st, use){
     var a = st.awaiting, t = a.p, f = a.foe;
@@ -1113,16 +1255,8 @@ var SG = (function(){
     st.awaiting = { p:f, type:'duel', foe:t };
   }
 
-  /* 【过河拆桥】/【顺手牵羊】：先打出牌，再让对方选一张牌（装备优先给选项） */
-  function doStealLike(st, kind){
-    var p = st.turn, t = 1-p, i = st.p[p].hand.indexOf(kind);
-    if(i < 0) return;
-    discardCard(st, p, i);
-    st.events.push({ type:'card', p:p, name:CARDS[kind] });
-    say(st, (kind === 'guohe' ? '🌉 ' : '🐑 ') + st.p[p].name + ' 使用【' + CARDS[kind] +
-      '】，要动 ' + st.p[t].name + ' 的一张牌。', p);
-    st.awaiting = { p:p, type:kind, t:t };
-  }
+  /* 【过河拆桥】/【顺手牵羊】：先打出牌过无懈询问，生效后由出牌方选目标牌 */
+  function doStealLike(st, kind){ doTrick(st, kind); }
 
   function resolveStealLike(st, mv){
     var a = st.awaiting, p = a.p, t = a.t, kind = a.type;
@@ -1299,6 +1433,13 @@ var SG = (function(){
     say(st, '==== ' + st.overReason + ' ====');
   }
 
+  /* 某方手里有没有能回应南蛮（杀）/ 万箭（闪）的牌（含龙胆 / 勇烈转换） */
+  function aiCanAnswer(st, who, trick){
+    var h = st.p[who].hand, pl = st.p[who];
+    if(trick === 'nanman') return slashIdxIn(h, pl).i >= 0;
+    return h.indexOf('dodge') >= 0 || (has(pl,'longdan') && h.indexOf('slash') >= 0);
+  }
+
   /* AI 挑对方一张牌：先动装备（越强越先），没装备就摸手牌 */
   function aiPickSlot(st, me, foe, lv){
     var E = eqp(st, foe), M = eqp(st, me);
@@ -1335,7 +1476,8 @@ var SG = (function(){
         return { t:'keep', idxs:keep };
       }
       if(a.type==='trim'){
-        var priT = { wzsy:0, jiu:1, juedou:2, shunshou:2, slash:2, guohe:3, nu:3, dodge:4, peach:6 };
+        var priT = { wzsy:0, jiu:1, juedou:2, shunshou:2, slash:2, guohe:3, nu:3, dodge:4, peach:6,
+                     nanman:3, wanjian:3, wuxie:5 };
         var arrT = [], dd = [];
         for(var mT=0;mT<h.length;mT++){
           var vT = priT[h[mT]];
@@ -1365,6 +1507,32 @@ var SG = (function(){
       if(a.type==='guohe' || a.type==='shunshou'){
         return { t:a.type, slot: aiPickSlot(st, p, a.t, lv) };
       }
+      if(a.type==='wuxie'){
+        if(h.indexOf('wuxie') < 0) return { t:'wuxie', use:false };
+        if(lv === 0 && st.rnd() < 0.5) return { t:'wuxie', use:false };   /* 陪玩一半忘了无懈 */
+        var meW = st.p[p];
+        if(a.p !== a.from){
+          /* 锦囊冲我来：会掉血（且接不住/血薄）或装备要被拆时才值得无懈 */
+          var nasty =
+            ((a.trick === 'nanman' || a.trick === 'wanjian') &&
+              (meW.hp <= 2 || !aiCanAnswer(st, p, a.trick))) ||
+            (a.trick === 'juedou' && (meW.hp <= 2 || slashIdxIn(h, meW).i < 0)) ||
+            ((a.trick === 'guohe' || a.trick === 'shunshou') &&
+              (eqp(st,p).weapon || eqp(st,p).armor));
+          return { t:'wuxie', use: !!nasty };
+        }
+        /* 我放的锦囊被无懈了：高手才舍得反无懈 */
+        return { t:'wuxie', use: lv === 2 };
+      }
+      if(a.type==='nanman'){
+        var pkN = slashIdxIn(h, st.p[p]);
+        return { t:'nanman', use: pkN.i >= 0 && !(lv === 0 && st.rnd() < 0.3) };
+      }
+      if(a.type==='wanjian'){
+        var canW = h.indexOf('dodge') >= 0 ||
+                   (has(st.p[p],'longdan') && h.indexOf('slash') >= 0);
+        return { t:'wanjian', use: canW && !(lv === 0 && st.rnd() < 0.3) };
+      }
       if(a.type==='dodge'){
         var hasDodge = a.canDodge && (h.indexOf('dodge') >= 0 || (has(st.p[p],'longdan') && h.indexOf('slash') >= 0));
         var worth = a.dmg + (has(st.p[p],'jinghong') ? 1 : 0);   /* 惊鸿：闪完还能反打一点 */
@@ -1384,7 +1552,8 @@ var SG = (function(){
       }
       if(a.type==='jinghong') return { t:'jinghong', use: !(lv === 0 && st.rnd() < 0.5) };
       if(a.type==='discard'){
-        var drop = [], prio = { wzsy:0, jiu:1, juedou:2, shunshou:2, slash:2, guohe:3, nu:3, dodge:4, peach:6 };
+        var drop = [], prio = { wzsy:0, jiu:1, juedou:2, shunshou:2, slash:2, guohe:3, nu:3, dodge:4, peach:6,
+                     nanman:3, wanjian:3, wuxie:5 };
         var arr = [];
         for(var m=0;m<h.length;m++){
           var pv = prio[h[m]];
@@ -1413,6 +1582,9 @@ var SG = (function(){
     var foeE = eqp(st, 1-p);
     if(L.shunshou && (foeE.weapon || foeE.armor)) return { t:'shunshou' };
     if(L.guohe && (foeE.weapon || foeE.armor)) return { t:'guohe' };
+    /* 南蛮 / 万箭：确认对方接不住才放（南蛮要杀、万箭要闪；对面空手稳赚） */
+    if(L.nanman && aiCanAnswer(st, 1-p, 'nanman') === false) return { t:'nanman' };
+    if(L.wanjian && aiCanAnswer(st, 1-p, 'wanjian') === false) return { t:'wanjian' };
     /* 决斗：对方先出杀，他手牌少的时候发起最划算（高手卡得更准） */
     if(L.juedou && (st.p[1-p].hand.length === 0 ||
         (hh.indexOf('slash') >= 0 && st.p[1-p].hand.length <= (lv === 2 ? 2 : 3))))
@@ -1490,6 +1662,15 @@ var SG = (function(){
         if(st.awaiting && st.awaiting.type === 'shunshou') resolveStealLike(st, mv);
         else doStealLike(st, 'shunshou');
         break;
+      case 'nanman':
+        if(st.awaiting && st.awaiting.type === 'nanman') resolveNanman(st, mv.use);
+        else doTrick(st, 'nanman');
+        break;
+      case 'wanjian':
+        if(st.awaiting && st.awaiting.type === 'wanjian') resolveWanjian(st, mv.use);
+        else doTrick(st, 'wanjian');
+        break;
+      case 'wuxie': resolveWuxie(st, mv.use); break;
       case 'equip': doEquip(st, mv.idx); break;
       case 'bagua': doBagua(st); break;
       case 'qinglong': doQinglong(st, mv.use); break;
@@ -1556,12 +1737,15 @@ function corner(h){
 var FC = { wei:'#2E5C8A', shu:'#3B7A3B', wu:'#B03A2E', qun:'#9A7B0A', shen:'#6D4C9F', shi:'#C86A27' };
 var CN = { slash:'杀', dodge:'闪', peach:'桃', wzsy:'无中生有', nu:'诸葛连弩',
   jiu:'酒', juedou:'决斗', guohe:'过河拆桥', shunshou:'顺手牵羊',
+  nanman:'南蛮入侵', wanjian:'万箭齐发', wuxie:'无懈可击',
   qinggang:'青釭剑', qinglong:'青龙偃月刀', guding:'古锭刀',
   bagua:'八卦阵', shizi:'白银狮子', huxin:'护心镜' };
 var DESC = { slash:'攻击对手，对方不出闪则掉血', dodge:'抵消一次杀', peach:'回复 1 点体力',
   wzsy:'立即摸 2 张牌', nu:'本回合出杀不限次数',
   jiu:'下一张杀伤害 +1（濒死可当桃）', juedou:'轮流出杀，先没杀的一方掉 1 血',
   guohe:'拆掉对方一张牌', shunshou:'夺得对方一张牌',
+  nanman:'对方不出杀则掉 1 血', wanjian:'对方不出闪则掉 1 血',
+  wuxie:'抵消一张锦囊对你的效果',
   qinggang:'你的杀无视对方防具', qinglong:'杀被闪掉可再补一刀',
   guding:'对方空手时伤害 +2', bagua:'判定红色可当闪用',
   shizi:'受到的杀伤害最多 1 点', huxin:'濒死时自动保命一次' };
@@ -1636,6 +1820,7 @@ function renderPicks(){
 }
 function pick(id){ myHero = id; SFX.click(); renderPicks(); }
 function startGame(foeId){
+  puzzleIdx = -1;                       /* 普通开局，摘掉闯关标记 */
   if(!foeId){
     var selEl = document.getElementById('foeSel');
     var v = selEl ? selEl.value : 'rand';
@@ -1657,6 +1842,7 @@ function startGame(foeId){
   if(mode==='ai') tick();
 }
 function backSetup(){
+  puzzleIdx = -1;                       /* 退回选将时摘掉闯关标记 */
   document.getElementById('setup').style.display = 'block';
   document.getElementById('board').style.display = 'none';
   G = null;
@@ -1730,6 +1916,112 @@ function flyCard(pid){
   }catch(e){}
 }
 
+/* ===== 残局闯关：十关固定残局，引擎完全复用，解法存在 PUZZLES[i].solution 里进测试 ===== */
+var PUZZLES = [
+  { name:'温酒斩敌', hero:'boy', foe:'lvbu',
+    desc:'一碗烈酒壮行：先喝【酒】再出【杀】，这一刀就是 2 点伤害。',
+    hp0:4, hp1:2, hand0:['jiu','slash'], hand1:[],
+    solution:[{t:'jiu'},{t:'slash'},{t:'save',use:false}] },
+  { name:'一锤定音', hero:'boy', foe:'lvbu',
+    desc:'对方空手、只剩 1 血：一张【决斗】直接定胜负。',
+    hp0:4, hp1:1, hand0:['juedou'], hand1:[],
+    solution:[{t:'juedou'},{t:'save',use:false}] },
+  { name:'连弩齐发', hero:'zhangfei', foe:'lvbu',
+    desc:'架起【诸葛连弩】，本回合出杀不限次数——三刀连发！',
+    hp0:4, hp1:3, hand0:['nu','slash','slash','slash'], hand1:[],
+    solution:[{t:'nu'},{t:'slash'},{t:'slash'},{t:'slash'},{t:'save',use:false}] },
+  { name:'破阵', hero:'boy', foe:'lvbu',
+    desc:'【白银狮子】把杀的伤害压到 1 点？先【过河拆桥】拆掉它，再酒杀！',
+    hp0:4, hp1:2, hand0:['guohe','jiu','slash'], hand1:[], a1:'shizi',
+    solution:[{t:'guohe'},{t:'guohe',slot:'armor'},{t:'jiu'},{t:'slash'},{t:'save',use:false}] },
+  { name:'草船借箭', hero:'zhugeliang', foe:'lvbu',
+    desc:'诸葛亮【借箭】：弃一张牌当杀用，这一箭不可闪！',
+    hp0:3, hp1:1, hand0:['peach'], hand1:['dodge'],
+    solution:[{t:'zhijian',idxs:[0]},{t:'save',use:false}] },
+  { name:'顺手牵羊', hero:'boy', foe:'lvbu',
+    desc:'【护心镜】能保命？先【顺手牵羊】把它抢过来，再送对方上路。',
+    hp0:4, hp1:2, hand0:['shunshou','jiu','slash'], hand1:[], a1:'huxin',
+    solution:[{t:'shunshou'},{t:'shunshou',slot:'armor'},{t:'jiu'},{t:'slash'},{t:'save',use:false}] },
+  { name:'南蛮踏营', hero:'boy', foe:'lvbu',
+    desc:'对方手里只有闪没有杀：【南蛮入侵】他接不住！',
+    hp0:4, hp1:1, hand0:['nanman','slash'], hand1:['dodge'],
+    solution:[{t:'nanman'},{t:'save',use:false}] },
+  { name:'万箭破城', hero:'boy', foe:'lvbu',
+    desc:'对方有杀没闪：先【万箭齐发】磨一血，再补一刀。',
+    hp0:4, hp1:2, hand0:['wanjian','slash'], hand1:['slash'],
+    solution:[{t:'wanjian'},{t:'slash'},{t:'save',use:false}] },
+  { name:'沉住气', hero:'boy', foe:'lvbu',
+    desc:'你只剩 1 血！决斗是诱饵——对方手里捏着两张杀。喝下酒，一刀制胜。',
+    hp0:1, hp1:2, hand0:['jiu','slash','juedou'], hand1:['slash','slash'],
+    solution:[{t:'jiu'},{t:'slash'},{t:'save',use:false}] },
+  { name:'空城计', hero:'zhugeliang', foe:'lvbu',
+    desc:'杀被闪掉也别慌：【借箭】不占出刀次数，手里只剩一张牌时空城伤害 +1。',
+    hp0:3, hp1:2, hand0:['slash','slash'], hand1:['dodge'],
+    solution:[{t:'slash'},{t:'zhijian',idxs:[0]},{t:'save',use:false}] }
+];
+var puzzleIdx = -1;
+function puzzleProgress(){
+  try{
+    if(typeof localStorage === 'undefined') return 0;
+    return parseInt(localStorage.getItem('sg_puzzle_v1') || '0', 10) || 0;
+  }catch(e){ return 0; }
+}
+function setPuzzleProgress(n){
+  try{ if(typeof localStorage !== 'undefined') localStorage.setItem('sg_puzzle_v1', String(n)); }catch(e){}
+}
+function showPuzzles(){
+  var prog = puzzleProgress();
+  document.getElementById('puzzleBody').innerHTML = PUZZLES.map(function(P, i){
+    var locked = i > prog, done = i < prog;
+    return '<div class="pz' + (locked ? ' locked' : '') + '"' +
+      (locked ? '' : ' onclick="pzGo(' + i + ')"') + '>' +
+      (done ? '<em>✅ 已通关</em>' : '') +
+      '<b>第' + (i + 1) + '关 · ' + P.name + '</b>' +
+      '<span>' + (locked ? '🔒 先通关上一关再来' : P.desc) + '</span></div>';
+  }).join('');
+  document.getElementById('puzzleOv').className = 'ov on';
+  SFX.click();
+}
+function closePuzzles(){ document.getElementById('puzzleOv').className = 'ov'; }
+function pzGo(i){ closePuzzles(); startPuzzle(i); }
+function startPuzzle(i){
+  var P = PUZZLES[i];
+  puzzleIdx = i; mode = 'ai'; myHero = P.hero; aiLv = 1;
+  G = SG.newGame({ seed: 42 + i, p0: P.hero, p1: P.foe, aiLevel: 1 });
+  /* 把随机场面改写成设计好的残局 */
+  G.deck = ['slash','dodge','peach','slash'];   /* 兜底牌堆，残局用不上 */
+  G.discard = [];
+  G.turn = 0; G.round = 1; G.phase = 'play'; G.awaiting = null;
+  G.slashUsed = 0; G.slashBonus = 0; G.nuActive = false; G.jiuBoost = 0;
+  G.p[0].hand = P.hand0.slice(); G.p[1].hand = P.hand1.slice();
+  G.p[0].hp = P.hp0; G.p[1].hp = P.hp1;
+  G.p[0].equip = { weapon: P.w0 || null, armor: P.a0 || null };
+  G.p[1].equip = { weapon: P.w1 || null, armor: P.a1 || null };
+  G.p[0].used = {}; G.p[1].used = {};
+  G.p[0].dying = false; G.p[1].dying = false;
+  G.log = [{ t:'🧩 第' + (i+1) + '关「' + P.name + '」——' + P.desc, who:-1 }];
+  sel = []; recorded = false;
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('board').style.display = 'block';
+  SFX.start();
+  render();
+}
+function retryPuzzle(){ document.getElementById('ov').className = 'ov'; startPuzzle(puzzleIdx); }
+function nextPuzzle(){
+  document.getElementById('ov').className = 'ov';
+  if(puzzleIdx + 1 < PUZZLES.length) startPuzzle(puzzleIdx + 1);
+}
+function quitPuzzle(){ puzzleIdx = -1; document.getElementById('ov').className = 'ov'; backSetup(); }
+/* 直接解锁一枚成就（不走对局结算），返回新解锁的成就对象或 null */
+function unlockAchDirect(id){
+  var s = loadStats(); if(!s) return null;
+  s.ach = s.ach || {};
+  if(s.ach[id]) return null;
+  s.ach[id] = 1; saveStats(s);
+  for(var i = 0; i < ACHS.length; i++) if(ACHS[i].id === id) return ACHS[i];
+  return null;
+}
+
 /* ===== 战绩本 + 成就（localStorage 本机留存，家庭换设备不带走） ===== */
 var SKEY = 'sg_stats_v1';
 function loadStats(){
@@ -1749,7 +2041,8 @@ var ACHS = [
   { id:'comeback',  icon:'💪', name:'绝地反击', desc:'只剩 1 点体力时取胜' },
   { id:'flawless',  icon:'✨', name:'毫发无损', desc:'满血取胜' },
   { id:'david',     icon:'🎯', name:'以下克上', desc:'用战力点数低 3 点以上的武将取胜' },
-  { id:'collector', icon:'🏆', name:'武将收藏家', desc:'15 位武将各赢一场' }
+  { id:'collector', icon:'🏆', name:'武将收藏家', desc:'15 位武将各赢一场' },
+  { id:'puzzler',   icon:'🧩', name:'破局者',   desc:'通关全部残局关卡' }
 ];
 var recorded = false;
 function recordResult(){
@@ -1841,7 +2134,12 @@ function render(){
       var mine = (ev.p === viewIdx());
       banner(mode === 'ai' ? (mine ? '轮到你了' : '对方回合')
                            : ('轮到 ' + G.p[ev.p].name + ' 出牌'));
-      speak(mine ? '轮到你出牌了' : '对方回合');
+      /* 同批事件里有出牌/技能播报时让位（语音 260ms 节流，别让横幅占坑） */
+      var busy2 = G.events.some(function(e){
+        return e.type==='card' || e.type==='skill' || e.type==='slash' ||
+               e.type==='dodge' || e.type==='heal' || e.type==='dying';
+      });
+      if(!busy2) speak(mine ? '轮到你出牌了' : '对方回合');
     }
     else if(ev.type === 'over'){ if(ev.w === 0) SFX.win(); else SFX.lose(); }
   });
@@ -1868,6 +2166,30 @@ function render(){
   renderActs();
 
   if(G.over){
+    var bn = document.getElementById('ovBtnsNormal'), bp = document.getElementById('ovBtnsPuzzle');
+    if(puzzleIdx >= 0){
+      /* 闯关结算：不进战绩本；赢了推进进度，末关通关解锁成就 */
+      recorded = true;
+      var pzWin = (G.winner === 0), achHtml = '';
+      if(pzWin){
+        if(puzzleIdx + 1 > puzzleProgress()) setPuzzleProgress(puzzleIdx + 1);
+        if(puzzleIdx === PUZZLES.length - 1){
+          var ach = unlockAchDirect('puzzler');
+          if(ach) achHtml = '🎉 新成就：' + ach.icon + ' ' + ach.name;
+        }
+      }
+      document.getElementById('ovTitle').textContent = pzWin ? '通关！' : '棋差一着';
+      document.getElementById('ovText').textContent = G.overReason;
+      document.getElementById('ovAch').innerHTML = achHtml;
+      var nb = document.getElementById('ovBtnNext');
+      if(nb) nb.style.display = (pzWin && puzzleIdx < PUZZLES.length - 1) ? '' : 'none';
+      if(bn) bn.style.display = 'none';
+      if(bp) bp.style.display = '';
+      document.getElementById('ov').className = 'ov on';
+      return;
+    }
+    if(bn) bn.style.display = '';
+    if(bp) bp.style.display = 'none';
     var fresh = recorded ? [] : recordResult();
     document.getElementById('ovTitle').textContent = G.winner===0?'胜利！':(G.winner<0?'平局':'再接再厉');
     document.getElementById('ovText').textContent = G.overReason;
@@ -1944,6 +2266,24 @@ function tapCard(i){
     else flash('只有【桃】或【酒】能救人，也可以点上面的按钮。');
     return;
   }
+  if(a && a.type==='wuxie'){
+    if(c==='wuxie'){ SG.apply(G, { t:'wuxie', use:true }); sel=[]; after(); }
+    else flash('只有【无懈可击】能响应锦囊，也可以点按钮让它生效。');
+    return;
+  }
+  if(a && a.type==='nanman'){
+    var canNm = c==='slash' || (c==='dodge' && SG.has(G.p[vi],'longdan')) ||
+                (c==='peach' && SG.has(G.p[vi],'yonglie'));
+    if(canNm){ SG.apply(G, { t:'nanman', use:true }); sel=[]; after(); }
+    else flash('【南蛮入侵】要打出一张【杀】，或者点按钮硬吃伤害。');
+    return;
+  }
+  if(a && a.type==='wanjian'){
+    var canWj = c==='dodge' || (c==='slash' && SG.has(G.p[vi],'longdan'));
+    if(canWj){ SG.apply(G, { t:'wanjian', use:true }); sel=[]; after(); }
+    else flash('【万箭齐发】要打出一张【闪】，或者点按钮硬吃伤害。');
+    return;
+  }
   if(a && (a.type==='jinglan' || a.type==='jinghong' ||
            a.type==='duel' || a.type==='guohe' || a.type==='shunshou')) return;
   if(a && a.type==='yusuan') return;
@@ -1966,6 +2306,9 @@ function tapCard(i){
   if(c==='juedou'){ if(L.juedou){ SG.apply(G,{t:'juedou'}); after(); } return; }
   if(c==='guohe'){ if(L.guohe){ SG.apply(G,{t:'guohe'}); after(); } return; }
   if(c==='shunshou'){ if(L.shunshou){ SG.apply(G,{t:'shunshou'}); after(); } return; }
+  if(c==='nanman'){ if(L.nanman){ SG.apply(G,{t:'nanman'}); after(); } return; }
+  if(c==='wanjian'){ if(L.wanjian){ SG.apply(G,{t:'wanjian'}); after(); } return; }
+  if(c==='wuxie'){ flash('【无懈可击】是响应牌：等对方对你用锦囊时才能打出。'); return; }
   if(SG.EQUIPS[c]){
     if(L.equip){ SG.apply(G,{t:'equip', idx:i}); after(); }
     else flash('现在是响应阶段，先把这一刀应付过去。');
@@ -2050,6 +2393,36 @@ function renderActs(){
       '<button onclick="act({t:\'qinglong\',use:false})">收刀</button>';
     return;
   }
+  if(a && a.type==='wuxie'){
+    var meWx = G.p[a.p], hasWx = meWx.hand.indexOf('wuxie') >= 0;
+    var what = a.count === 0
+      ? G.p[a.from].name + ' 对你使用了【' + CN[a.trick] + '】'
+      : (a.p === a.from ? '你的【' + CN[a.trick] + '】被无懈了'
+                        : '对方的无懈被反无懈，【' + CN[a.trick] + '】又要生效了');
+    box.innerHTML = '<span style="font-size:13px;">🚫 ' + what + '，要打出【无懈可击】吗？</span>' +
+      '<button class="pri"' + (hasWx?'':' disabled') + ' onclick="act({t:\'wuxie\',use:true})">打出【无懈可击】</button>' +
+      '<button onclick="act({t:\'wuxie\',use:false})">' + (hasWx ? '不无懈，让它生效' : '没有无懈，只能生效') + '</button>';
+    return;
+  }
+  if(a && a.type==='nanman'){
+    var hNm = G.p[a.p].hand;
+    var canNm2 = hNm.indexOf('slash') >= 0 ||
+      (SG.has(G.p[a.p],'longdan') && hNm.indexOf('dodge') >= 0) ||
+      (SG.has(G.p[a.p],'yonglie') && hNm.indexOf('peach') >= 0);
+    box.innerHTML = '<span style="font-size:13px;">🐘 【南蛮入侵】！打出一张【杀】，否则掉 1 血。</span>' +
+      '<button class="pri"' + (canNm2?'':' disabled') + ' onclick="act({t:\'nanman\',use:true})">打出【杀】</button>' +
+      '<button onclick="act({t:\'nanman\',use:false})">' + (canNm2 ? '不出，硬吃 1 点' : '没有杀，硬吃 1 点') + '</button>';
+    return;
+  }
+  if(a && a.type==='wanjian'){
+    var hWj = G.p[a.p].hand;
+    var canWj2 = hWj.indexOf('dodge') >= 0 ||
+      (SG.has(G.p[a.p],'longdan') && hWj.indexOf('slash') >= 0);
+    box.innerHTML = '<span style="font-size:13px;">🏹 【万箭齐发】！打出一张【闪】，否则掉 1 血。</span>' +
+      '<button class="pri"' + (canWj2?'':' disabled') + ' onclick="act({t:\'wanjian\',use:true})">打出【闪】</button>' +
+      '<button onclick="act({t:\'wanjian\',use:false})">' + (canWj2 ? '不出，硬吃 1 点' : '没有闪，硬吃 1 点') + '</button>';
+    return;
+  }
   if(a && a.type==='duel'){
     var canDs = G.p[a.p].hand.indexOf('slash') >= 0 ||
       (SG.has(G.p[a.p],'longdan') && G.p[a.p].hand.indexOf('dodge') >= 0) ||
@@ -2091,6 +2464,8 @@ function renderActs(){
     '<button' + (L.juedou?'':' disabled') + ' onclick="act({t:\'juedou\'})">【决斗】</button>' +
     '<button' + (L.guohe?'':' disabled') + ' onclick="act({t:\'guohe\'})">【过河拆桥】</button>' +
     '<button' + (L.shunshou?'':' disabled') + ' onclick="act({t:\'shunshou\'})">【顺手牵羊】</button>' +
+    '<button' + (L.nanman?'':' disabled') + ' onclick="act({t:\'nanman\'})">【南蛮入侵】</button>' +
+    '<button' + (L.wanjian?'':' disabled') + ' onclick="act({t:\'wanjian\'})">【万箭齐发】</button>' +
     '<button' + (L.nu?' class="pri"':' disabled') + ' onclick="act({t:\'nu\'})">诸葛连弩</button>' +
     (L.qimou ? '<button onclick="act({t:\'qimou\'})">【奇谋】弃1张→1点必中伤害</button>' : '') +
     (L.yehuo ? '<button onclick="act({t:\'yehuo\'})">【业火】弃2张→2点必中伤害</button>' : '') +
@@ -2309,6 +2684,7 @@ var VOICE_LINE = {
   '凿险':'凿险偷渡', '阴平':'阴平小道', '少年志':'少年之志',
   '诸葛连弩':'连弩齐射',
   '酒':'酒壮英雄胆', '决斗':'决一死战', '过河拆桥':'过河拆桥', '顺手牵羊':'顺手牵羊',
+  '南蛮入侵':'南蛮入侵', '万箭齐发':'万箭齐发', '无懈可击':'无懈可击',
   '青釭剑':'青釭出鞘', '青龙偃月刀':'青龙偃月', '古锭刀':'古锭刀出',
   '八卦阵':'八卦阵起', '白银狮子':'白银狮子', '护心镜':'护心镜护体'
 };

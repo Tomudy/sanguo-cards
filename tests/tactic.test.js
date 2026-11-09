@@ -47,7 +47,7 @@ function total(st){
   const st = SG.newGame({ seed: 1, p0: 'boy', p1: 'lvbu' });
   const all = st.p[0].hand.concat(st.p[1].hand, st.deck, st.discard);
   const cnt = id => all.filter(c => c === id).length;
-  ok(all.length === 75, '整副牌 75 张（实际 ' + all.length + '）');
+  ok(all.length === 80, '整副牌 80 张（实际 ' + all.length + '）');
   ok(cnt('jiu') === 3 && cnt('juedou') === 3 && cnt('guohe') === 3 && cnt('shunshou') === 2,
      '战术牌：酒 3 / 决斗 3 / 拆桥 3 / 顺手 2');
 }
