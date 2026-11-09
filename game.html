@@ -63,7 +63,7 @@ button:disabled{opacity:.4;cursor:not-allowed;}
 .equips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
 .eq{font-size:10.5px;line-height:1.7;border:1px dashed #c9c3b4;border-radius:5px;
   padding:0 6px;color:#a9a396;white-space:nowrap;}
-.eq.on{border-style:solid;border-color:#C9A227;background:#FBF3DB;color:#7a5a0a;font-weight:700;}
+.eq.on{cursor:pointer;}border-style:solid;border-color:#C9A227;background:#FBF3DB;color:#7a5a0a;font-weight:700;}
 /* 技能类型标签：锁定 / 触发 / 主动 —— 一眼看出这个技能什么时候生效 */
 .kind-tag{display:inline-block;font-size:9px;line-height:1.5;padding:0 4px;margin:0 3px;
   border-radius:3px;vertical-align:1px;font-weight:700;letter-spacing:.5px;}
@@ -129,7 +129,20 @@ button:disabled{opacity:.4;cursor:not-allowed;}
 .myhand{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px;min-height:96px;}
 .cards{display:flex;gap:8px;flex-wrap:wrap;}
 .card{border-radius:10px;padding:8px 10px;min-width:62px;text-align:center;cursor:pointer;
-  border:1px solid #c3beb0;background:#fff;font-size:13px;line-height:1.3;}
+  border:1px solid #c3beb0;background:#fff;font-size:13px;line-height:1.3;position:relative;}
+.cinfo{position:absolute;top:-7px;right:-7px;width:19px;height:19px;line-height:19px;border-radius:50%;
+  background:#31597E;color:#fff;font-size:11px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.3);z-index:2;}
+.banner{position:fixed;left:0;right:0;top:36%;text-align:center;font-size:34px;font-weight:800;
+  color:#31597E;text-shadow:0 2px 12px rgba(255,255,255,.95),0 0 2px #fff;
+  opacity:0;pointer-events:none;z-index:60;}
+.banner.go{animation:bannerGo 1.4s ease forwards;}
+@keyframes bannerGo{
+  0%{opacity:0;transform:scale(.6);}
+  18%{opacity:1;transform:scale(1.08);}
+  30%{transform:scale(1);}
+  72%{opacity:1;}
+  100%{opacity:0;transform:scale(1.03);}
+}
 .card:hover{transform:translateY(-2px);}
 .card.sel{border:2px solid #31597E;}
 .card.slash{color:#B03A2E;} .card.dodge{color:#2E5C8A;} .card.peach{color:#B84B6B;} .card.wzsy{color:#9A7B0A;} .card.nu{color:#6D4C9F;}
@@ -141,7 +154,7 @@ button:disabled{opacity:.4;cursor:not-allowed;}
 .card small{display:block;font-size:10px;color:#8a857a;margin-top:2px;}
 .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
 .tip{font-size:12px;color:#8a4b2a;background:#FBEEE6;border-radius:8px;padding:6px 10px;margin-top:8px;}
-.ov{display:none;position:fixed;inset:0;background:rgba(30,28,24,.55);align-items:center;justify-content:center;}
+.ov{display:none;position:fixed;inset:0;background:rgba(30,28,24,.55);align-items:center;justify-content:center;z-index:70;}
 .ov.on{display:flex;}
 .ovbox{background:var(--paper);border-radius:16px;padding:24px 30px;text-align:center;min-width:240px;}
 .ovbox h2{font-size:20px;margin-bottom:8px;}
@@ -210,7 +223,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   <h1>三国武将 · 亲子对战
     <span class="mute" onclick="toggleMute()">🔊 音效：<span id="muteTxt">开</span></span>
     <span class="mute" style="margin-right:10px;" onclick="toggleVoice()">🎙 语音：<span id="voiceTxt">开</span></span>
-    <span class="mute" style="margin-right:10px;" onclick="toggleBgm()">🥁 战鼓：<span id="bgmTxt">关</span></span>
+    <span class="mute" style="margin-right:10px;" onclick="toggleBgm()">🎶 配乐：<span id="bgmTxt">关</span></span>
   </h1>
   <p class="sub">简化规则：基本牌【杀】【闪】【桃】【无中生有】+ 战术牌【酒】【决斗】【过河拆桥】【顺手牵羊】
   + 神兵【诸葛连弩】+ 6 种装备。每回合摸 2 张 → 出牌 → 手牌超过体力上限要弃。<br>
@@ -238,6 +251,9 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
         <button onclick="setAiLv(1)" id="btnLv1" class="pri">标准</button>
         <button onclick="setAiLv(2)" id="btnLv2">高手</button>
       </span>
+      <span id="foeRow" style="font-size:13px;">挑战：
+        <select id="foeSel" style="font-size:13px;padding:4px 6px;border-radius:6px;border:1px solid #c3beb0;max-width:150px;"></select>
+      </span>
       <button class="pri" onclick="startGame()">开始对战</button>
       <button onclick="showStats()">🏆 战绩</button>
     </div>
@@ -261,8 +277,17 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 <div class="ov" id="ov"><div class="ovbox">
   <h2 id="ovTitle"></h2><p id="ovText"></p>
   <div id="ovAch"></div>
-  <button class="pri" onclick="again()">再来一局</button>
+  <button class="pri" onclick="rematch(true)">再战一局</button>
+  <button onclick="rematch(false)">换个对手</button>
+  <button onclick="quitToSetup()">返回选将</button>
 </div></div>
+
+<div class="ov" id="cardOv"><div class="ovbox" style="max-width:340px;">
+  <h2 id="cardName"></h2><p id="cardDesc" style="text-align:left;line-height:1.7;"></p>
+  <button class="pri" onclick="closeCardOv()">知道了</button>
+</div></div>
+
+<div class="banner" id="banner"></div>
 
 <div class="ov" id="statsOv"><div class="ovbox" style="max-width:560px;max-height:82vh;overflow-y:auto;text-align:center;">
   <h2>🏆 战绩与成就</h2>
@@ -441,6 +466,7 @@ var SG = (function(){
 
   function beginTurn(st){
     var p = st.turn;
+    st.events.push({ type:'turn', p:p });   /* UI 用来播回合横幅 */
     st.slashUsed = 0;
     st.slashBonus = 0;
     st.nuActive = false;      /* 连弩只持续本回合 */
@@ -1543,6 +1569,7 @@ var DESC = { slash:'攻击对手，对方不出闪则掉血', dodge:'抵消一�
 var KINDS = { locked:'锁定', trigger:'触发', active:'主动' };
 
 var myHero = 'boy', mode = 'ai', G = null, sel = [], muted = false, busy = false;
+var foeHero = null;   /* 本局对手，供"再战一局"复用 */
 /* AI 难度档：0 陪玩 / 1 标准 / 2 高手（记忆在上次选择） */
 var AINAMES = { 0:'陪玩', 1:'标准', 2:'高手' };
 var aiLv = 1;
@@ -1595,11 +1622,31 @@ function renderPicks(){
         '<br><span style="color:#8a857a">' + HINT[h.id] + '</span></div>' +
     '</div>';
   }).join('');
+  /* 对手下拉：默认随机；选了谁下局就打谁（不能打自己） */
+  var fs2 = document.getElementById('foeSel');
+  if(fs2){
+    var cur = fs2.value;
+    fs2.innerHTML = '<option value="rand">🎲 随机对手</option>' +
+      SG.HEROES.filter(function(h){ return h.id !== myHero; }).map(function(h){
+        return '<option value="' + h.id + '">' + h.name + '（战力 ' + h.power + '）</option>';
+      }).join('');
+    fs2.value = cur;
+    if(fs2.value !== cur) fs2.value = 'rand';
+  }
 }
 function pick(id){ myHero = id; SFX.click(); renderPicks(); }
-function startGame(){
-  var foe = SG.HEROES.filter(function(h){ return h.id !== myHero; });
-  var foeId = foe[Math.floor(Math.random()*foe.length)].id;
+function startGame(foeId){
+  if(!foeId){
+    var selEl = document.getElementById('foeSel');
+    var v = selEl ? selEl.value : 'rand';
+    if(v && v !== 'rand' && v !== myHero && SG.HEROES.some(function(h){ return h.id === v; })){
+      foeId = v;
+    }else{
+      var foe = SG.HEROES.filter(function(h){ return h.id !== myHero; });
+      foeId = foe[Math.floor(Math.random()*foe.length)].id;
+    }
+  }
+  foeHero = foeId;
   G = SG.newGame({ seed:(Math.random()*1e9)|0, p0:myHero, p1:foeId, aiLevel: aiLv });
   sel = [];
   recorded = false;
@@ -1620,7 +1667,8 @@ function eqRow(pl){
   var E = pl.equip || {};
   var mk = function(slot, label){
     var id = E[slot];
-    return '<span class="eq' + (id ? ' on' : '') + '">' + label + ' · ' +
+    return '<span class="eq' + (id ? ' on' : '') + '"' +
+      (id ? ' onclick="showCard(\'' + id + '\')"' : '') + '>' + label + ' · ' +
       (id ? CN[id] : '空') + '</span>';
   };
   return '<div class="equips">' + mk('weapon', '🗡 武器') + mk('armor', '🛡 防具') + '</div>';
@@ -1789,6 +1837,12 @@ function render(){
     else if(ev.type === 'skill'){ SFX.skill(); if(ev.name) speak(ev.name); }
     else if(ev.type === 'card'){ speak(ev.name); }
     else if(ev.type === 'dying'){ SFX.dying(); if(ev.p === 0) buzz([180, 80, 180]); speak('求桃'); }
+    else if(ev.type === 'turn'){
+      var mine = (ev.p === viewIdx());
+      banner(mode === 'ai' ? (mine ? '轮到你了' : '对方回合')
+                           : ('轮到 ' + G.p[ev.p].name + ' 出牌'));
+      speak(mine ? '轮到你出牌了' : '对方回合');
+    }
     else if(ev.type === 'over'){ if(ev.w === 0) SFX.win(); else SFX.lose(); }
   });
   G.events = [];
@@ -1826,6 +1880,25 @@ function render(){
 
 function viewIdx(){ return mode === 'ai' ? 0 : SG.active(G); }
 
+/* 回合横幅：大字过场，纯 CSS 动画，不挡操作 */
+function banner(text){
+  var b = document.getElementById('banner');
+  if(!b) return;
+  b.textContent = text;
+  b.classList.remove('go'); void b.offsetWidth;
+  b.classList.add('go');
+}
+
+/* 卡牌说明浮层：手牌角标与装备槽共用 */
+function showCard(id){
+  var d = (SG.EQUIPS && SG.EQUIPS[id]) ? SG.EQUIPS[id].desc : (DESC[id] || '');
+  document.getElementById('cardName').textContent = CN[id] || id;
+  document.getElementById('cardDesc').textContent = d;
+  document.getElementById('cardOv').className = 'ov on';
+  SFX.click();
+}
+function closeCardOv(){ document.getElementById('cardOv').className = 'ov'; }
+
 function renderHand(){
   var box = document.getElementById('hand');
   var vi = viewIdx();
@@ -1835,7 +1908,9 @@ function renderHand(){
   var clickable = (SG.active(G) === vi);
   box.innerHTML = G.p[vi].hand.map(function(c,i){
     return '<div class="card ' + c + (sel.indexOf(i)>=0?' sel':'') + '"' +
-      (clickable?' onclick="tapCard(' + i + ')"':'') + '>' + CN[c] + '<small>' + DESC[c] + '</small></div>';
+      (clickable?' onclick="tapCard(' + i + ')"':'') + '>' +
+      '<span class="cinfo" onclick="event.stopPropagation();showCard(\'' + c + '\')">?</span>' +
+      CN[c] + '<small>' + DESC[c] + '</small></div>';
   }).join('');
 }
 
@@ -2059,9 +2134,22 @@ function tick(){
   busy = false;
 }
 
+/* 联机壳会覆盖 window.again / window.startGame，所以这里统一走 again()：
+   单机 = 原对手立刻再来；联机 = 交给服务器重开（对手由服务器随机）。
+   换了联机壳后，"换个对手"也走服务器重开，避免直接调 startGame 打乱房间状态。 */
 function again(){
   document.getElementById('ov').className = 'ov';
-  startGame();
+  startGame(foeHero);
+}
+function rematch(same){
+  if(same || (window.MP && window.MP.on)) return again();
+  document.getElementById('ov').className = 'ov';
+  var foe = SG.HEROES.filter(function(h){ return h.id !== myHero && h.id !== foeHero; });
+  startGame(foe[Math.floor(Math.random()*foe.length)].id);
+}
+function quitToSetup(){
+  document.getElementById('ov').className = 'ov';
+  backSetup();
 }
 
 /* ===== 音效：全部用 Web Audio 现场合成，不加载任何音频文件 ===== */
@@ -2088,6 +2176,7 @@ function unlockAudio(){
   if(c && c.state === 'suspended' && c.resume){
     try{ c.resume(); }catch(e){}
   }
+  if(bgmOn && !bgmTimer) startBgm();   /* 上次开着配乐的话，第一次点屏幕就响起 */
   /* iOS 的语音合成同样要求手势内先"开口"，播一个静音空句解锁 */
   try{
     if(typeof speechSynthesis !== 'undefined' && typeof SpeechSynthesisUtterance !== 'undefined'){
@@ -2155,11 +2244,27 @@ var SFX = {
   win:   function(){ [523,587,659,784,880].forEach(function(f,i){ tone({ f:f, type:'triangle', dur:0.30, vol:0.12, delay:i*0.12 }); }); },
   lose:  function(){ [440,392,330,262].forEach(function(f,i){ tone({ f:f, type:'sine', dur:0.34, vol:0.12, delay:i*0.16 }); }); }
 };
-var PENTA = [262,294,330,392,440,523,587,659];
-function bgmStep(){
+/* 背景音乐：五声音阶（宫商角徵羽）双乐句循环 + 战鼓 + 低音持续音。
+   全部现场合成；步长 0.42s，16 步一句，两句轮换。 */
+var BGM_BARS = [
+  [330,0,392,440, 392,0,330,0, 294,0,330,0, 262,0,0,0],
+  [440,0,392,0,   330,0,392,0, 440,523,0,0, 392,0,330,0]
+];
+var BGM_BASS = [131, 98];             /* 宫 / 徵 的低八度 */
+var bgmPos = 0, bgmBar = 0;
+function bgmTick(){
   if(!bgmOn || muted) return;
-  tone({ f:PENTA[(Math.random()*PENTA.length)|0], type:'triangle', dur:0.55, vol:0.045 });
-  if(Math.random() < 0.55) noise({ freq:170, dur:0.17, vol:0.055, q:0.8 });
+  var bar = BGM_BARS[bgmBar % BGM_BARS.length], st = bgmPos % 16;
+  var f = bar[st];
+  if(f) tone({ f:f, type:'triangle', dur:0.5, vol:0.038 });          /* 拨弦旋律 */
+  if(st === 0 || st === 8){                                          /* 战鼓：每半小节一记 */
+    tone({ f:95, to:48, type:'sine', dur:0.30, vol:0.10 });
+    noise({ freq:160, dur:0.12, vol:0.05, q:0.7 });
+    tone({ f:BGM_BASS[(bgmBar + (st ? 1 : 0)) % 2], type:'sine', dur:1.4, vol:0.028 });
+  }
+  if(st === 4 || st === 12) noise({ freq:900, dur:0.05, vol:0.025 }); /* 轻梆子 */
+  bgmPos++;
+  if(bgmPos % 16 === 0) bgmBar++;
 }
 function toggleMute(){ muted = !muted; document.getElementById('muteTxt').textContent = muted ? '关' : '开'; }
 
@@ -2230,12 +2335,26 @@ function toggleVoice(){
   if(!voiceOn){ try{ var syn = _vsyn(); if(syn) syn.cancel(); }catch(e){} }
   else speak('语音已开启');
 }
+function startBgm(){
+  if(bgmTimer || !bgmOn) return;
+  ac(); bgmPos = 0; bgmBar = 0;
+  bgmTick(); bgmTimer = setInterval(bgmTick, 420);
+}
 function toggleBgm(){
   bgmOn = !bgmOn;
+  try{ if(typeof localStorage !== 'undefined') localStorage.setItem('sg_bgm_v1', bgmOn ? '1' : '0'); }catch(e){}
   document.getElementById('bgmTxt').textContent = bgmOn ? '开' : '关';
-  if(bgmOn){ ac(); bgmStep(); bgmTimer = setInterval(bgmStep, 900); }
+  if(bgmOn) startBgm();
   else if(bgmTimer){ clearInterval(bgmTimer); bgmTimer = null; }
 }
+/* 恢复上次的配乐开关。浏览器要求首次手势后才能出声，所以这里只记状态，
+   真正启动在 unlockAudio（首次触摸/点击）里。 */
+try{
+  if(typeof localStorage !== 'undefined' && localStorage.getItem('sg_bgm_v1') === '1'){
+    bgmOn = true;
+    var _bt = document.getElementById('bgmTxt'); if(_bt) _bt.textContent = '开';
+  }
+}catch(e){}
 
 renderPicks();
 setMode('ai');

@@ -100,6 +100,40 @@ for (const mode of ['ai', 'pvp']) {
 
 console.log('界面冒烟：' + runs + ' 局（ai / pvp × 全部武将），正常结束 ' + ended + ' 局');
 console.log('濒死分支覆盖：濒死自救 ' + cov.dying + ' 次，对手求救 ' + cov.save + ' 次');
-if (unfinished.length) console.log('步数耗尽未分胜负（僵持局，非死锁）：\n  ' + unfinished.join('\n  '));
+
+/* ===== 界面三件套 + 配乐 的专项断言 ===== */
+// 1) 对手下拉已渲染且含"随机对手"，选项不含自己（重渲染后再断言）
+sandbox.renderPicks();
+ok(store.foeSel && store.foeSel.innerHTML.indexOf('随机对手') >= 0, '对手下拉未渲染');
+ok(store.foeSel.innerHTML.indexOf('value="' + sandbox.myHero + '"') < 0, '对手下拉里出现了自己');
+// 2) 手牌带说明角标、回合横幅播过、战报浮层可打开
+ok(store.hand.innerHTML.indexOf('cinfo') >= 0 || store.hand.innerHTML.indexOf('没有手牌') >= 0,
+  '手牌缺少说明角标');
+ok(store.banner && store.banner.textContent.length > 0, '回合横幅没有播放过');
+sandbox.showCard('slash');
+ok(store.cardName.textContent === '杀' && store.cardDesc.textContent.indexOf('攻击') >= 0,
+  '卡牌说明浮层内容不对');
+sandbox.showCard('bagua');
+ok(store.cardDesc.textContent.indexOf('判定') >= 0, '装备说明浮层没用完整描述');
+sandbox.closeCardOv();
+ok(store.cardOv.className === 'ov', '说明浮层关不掉');
+// 3) 再战一局复用同一对手；换个对手必换人
+const foe1 = sandbox.foeHero;
+sandbox.rematch(true);
+ok(sandbox.G && sandbox.G.p[1].hero.id === foe1, '再战一局没有复用原对手');
+sandbox.rematch(false);
+ok(sandbox.G && sandbox.G.p[1].hero.id !== foe1, '换个对手没有换人');
+// 4) 配乐开关可切换且不抛异常（桩环境无声，只验证状态与文案）
+sandbox.toggleBgm();
+ok(store.bgmTxt.textContent === '开', '配乐开关打开后文案未更新');
+sandbox.toggleBgm();
+ok(store.bgmTxt.textContent === '关', '配乐开关关闭后文案未更新');
+// 5) 结构化 BGM 数据：双乐句各 16 步，旋律音都落在五声音阶内
+ok(sandbox.BGM_BARS.length === 2 && sandbox.BGM_BARS.every(b => b.length === 16),
+  'BGM 乐句结构不对');
+const PENTA_SET = [262, 294, 330, 392, 440, 523, 587, 659];
+ok(sandbox.BGM_BARS.every(b => b.every(f => f === 0 || PENTA_SET.indexOf(f) >= 0)),
+  'BGM 旋律跑出五声音阶了');
+
 console.log(fail === 0 ? '全部通过' : ('失败 ' + fail + ' 项'));
 process.exit(fail === 0 ? 0 : 1);
