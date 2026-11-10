@@ -40,6 +40,13 @@ h1{font-size:18px;margin-bottom:4px;}
 .pick .pn{font-family:"KaiTi",serif;font-weight:700;font-size:14px;margin:6px 0 2px;}
 .pick .pf{font-size:11px;color:#8a857a;}
 .pick .ps{font-size:10px;color:#6b665c;margin-top:4px;line-height:1.4;text-align:left;}
+/* 双将选将：主/副角标 */
+.duo-tag{position:absolute;left:50%;top:-7px;transform:translateX(-50%);background:#31597E;color:#fff;
+  font-size:11px;line-height:1;padding:3px 8px 3px 10px;border-radius:8px;letter-spacing:2px;
+  box-shadow:0 1px 3px rgba(0,0,0,.25);z-index:2;}
+/* 战场双将头像：两位武将上下拼一格 */
+.face.face2{display:flex;flex-direction:column;overflow:hidden;padding:0;}
+.face.face2 img{width:100%;height:50%;object-fit:cover;object-position:center 12%;flex:none;}
 .rowbtn{display:flex;gap:10px;margin:14px 0;flex-wrap:wrap;align-items:center;}
 button{padding:8px 16px;border-radius:8px;border:1px solid #c3beb0;background:#fff;font-size:14px;cursor:pointer;}
 button:hover{background:#f2efe6;}
@@ -241,10 +248,13 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   装备：武器位、防具位各一格，装上就长期生效、不占手牌；同槽位装新的会替换旧的。<br>
   出杀次数：小将军 2 次、张飞 2 次、神姜维 3 次，其余武将 1 次；每回合只能吃 1 张【桃】。<br>
   <b style="color:#B03A2E;">濒死规则</b>：体力被打到 0 时不立即判负，而是进入濒死 —— 你可以打出一张【桃】救回自己（体力回到 1 点，濒死求桃不受"每回合 1 张"限制）；
-  自己没有桃时，对手可以选择出桃相救。无人施救才真正阵亡。60 轮未分胜负判和。</p>
+  自己没有桃时，对手可以选择出桃相救。无人施救才真正阵亡。60 轮未分胜负判和。<br>
+  <b>🎭 双将模式</b>：一次执两位武将，两套技能全部生效！体力上限 = 两人之和的一半（向上取整），
+  出【杀】上限取两人较大值，战力点数 = 两人之和。<b>注意：双将之间有明显的克制关系，
+  总点数只是粗略参考</b>——多试几局，找到打得五五开的对手组合才是真的势均力敌。</p>
 
   <div id="setup">
-    <p style="font-size:13px;margin-bottom:8px;">1. 选你的武将（点一下选中，可换人）</p>
+    <p id="pickTip" style="font-size:13px;margin-bottom:8px;">1. 选你的武将（点一下选中，可换人）</p>
     <p class="legend">
       卡角花色 = 势力：<b class="black">♠ 魏</b> · <b class="red">♥ 蜀</b> · <b class="black">♣ 吴</b> ·
       <b class="red">♦ 群</b> · <b style="color:#6D4C9F;">★ 神</b> · <b style="color:#C86A27;">◆ 势</b><br>
@@ -252,6 +262,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
       父子对战想势均力敌，就挑点数相近的；想挑战 Boss 就选神将/势将。</p>
     <div class="picks" id="picks"></div>
     <div class="rowbtn">
+      <button onclick="setDual()" id="btnDual">🎭 双将模式：关</button>
       <span style="font-size:13px;">对手：</span>
       <button onclick="setMode('ai')" id="btnAi">电脑</button>
       <button onclick="setMode('pvp')" id="btnPvp">爸爸/同学（同机轮流）</button>
@@ -260,10 +271,10 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
         <button onclick="setAiLv(1)" id="btnLv1" class="pri">标准</button>
         <button onclick="setAiLv(2)" id="btnLv2">高手</button>
       </span>
-      <span id="foeRow" style="font-size:13px;">挑战：
+      <span id="foeRow" style="font-size:13px;"><span id="foeLbl">挑战：</span>
         <select id="foeSel" style="font-size:13px;padding:4px 6px;border-radius:6px;border:1px solid #c3beb0;max-width:150px;"></select>
       </span>
-      <button class="pri" onclick="startGame()">开始对战</button>
+      <button class="pri" onclick="startGame()" id="btnStart">开始对战</button>
       <button onclick="showPuzzles()">🧩 闯关</button>
       <button onclick="showStats()">🏆 战绩</button>
     </div>
@@ -442,7 +453,7 @@ var SG = (function(){
 
   function newGame(opts){
     var rnd = rngFrom(opts.seed || (Date.now() & 0xffffff));
-    var h0 = hero(opts.p0), h1 = hero(opts.p1 || 'jiangwei');
+    var h0 = heroPick(opts.p0), h1 = heroPick(opts.p1 || 'jiangwei');
     var st = {
       rnd: rnd, deck: shuffle(buildDeck(), rnd), discard: [],
       turn: 0, round: 1, winner: null, over: false, overReason: '',
@@ -466,6 +477,27 @@ var SG = (function(){
   function hero(id){
     for(var i=0;i<HEROES.length;i++) if(HEROES[i].id===id) return HEROES[i];
     return HEROES[0];
+  }
+
+  /* ===== 双将模式 =====
+     一人执两位武将，两套技能全部生效：
+     - 体力上限 = 两人体力之和的一半（向上取整），与国战"阴阳鱼"同口径；
+     - 战力点数 = 两人之和（选将时对比总点数即可）；
+     - 出杀次数上限取两人中的较大值；
+     - 传字符串 = 单将（联机、旧调用完全不变），传数组 = 双将。 */
+  function heroPick(v){
+    if(Object.prototype.toString.call(v) !== '[object Array]' || v.length < 2) return hero(v);
+    var a = hero(v[0]), b = hero(v[1]);
+    return {
+      dual: true, id: a.id, id2: b.id,
+      name: a.name + '·' + b.name,
+      faction: a.faction, factionB: b.faction,
+      hp: Math.ceil((a.hp + b.hp) / 2),
+      power: a.power + b.power,
+      handBonus: (a.handBonus || 0) + (b.handBonus || 0),
+      slashLimit: Math.max(a.slashLimit, b.slashLimit),
+      skills: a.skills.concat(b.skills)
+    };
   }
 
   function say(st, txt, who){
@@ -1754,6 +1786,8 @@ var KINDS = { locked:'锁定', trigger:'触发', active:'主动' };
 
 var myHero = 'boy', mode = 'ai', G = null, sel = [], muted = false, busy = false;
 var foeHero = null;   /* 本局对手，供"再战一局"复用 */
+/* 双将模式：myDuo = [主将id, 副将id]；单将时仍是 myHero */
+var dualMode = false, myDuo = [];
 /* AI 难度档：0 陪玩 / 1 标准 / 2 高手（记忆在上次选择） */
 var AINAMES = { 0:'陪玩', 1:'标准', 2:'高手' };
 var aiLv = 1;
@@ -1795,9 +1829,16 @@ var HINT = {
 };
 
 function renderPicks(){
+  var pt = document.getElementById('pickTip');
+  if(pt) pt.innerHTML = dualMode
+    ? '1. 点两位武将组成双将（先点的是<b>主将</b>；已满两位再点会换掉副将，点已选中的可取消）'
+    : '1. 选你的武将（点一下选中，可换人）';
+  var usedIds = dualMode ? myDuo : [myHero];
   document.getElementById('picks').innerHTML = SG.HEROES.map(function(h){
-    return '<div class="pick' + (h.id===myHero?' on':'') + '" onclick="pick(\'' + h.id + '\')">' +
-      corner(h) +
+    var on = usedIds.indexOf(h.id) >= 0;
+    var tag = dualMode && on ? '<span class="duo-tag">' + (usedIds[0] === h.id ? '主' : '副') + '</span>' : '';
+    return '<div class="pick' + (on?' on':'') + '" onclick="pick(\'' + h.id + '\')">' +
+      corner(h) + tag +
       '<img src="' + ART[h.id] + '" alt="">' +
       '<div class="pn" style="color:' + FC[h.faction] + '">' + h.name + '</div>' +
       '<div class="pf">' + FCN[h.faction] + ' · ' + h.hp + ' 体力 · 战力 ' + h.power + '</div>' +
@@ -1806,25 +1847,58 @@ function renderPicks(){
         '<br><span style="color:#8a857a">' + HINT[h.id] + '</span></div>' +
     '</div>';
   }).join('');
-  /* 对手下拉：默认随机；选了谁下局就打谁（不能打自己） */
+  var sb = document.getElementById('btnStart');
+  if(sb) sb.disabled = dualMode && myDuo.length < 2;   /* 双将要选满两位才能开战 */
+  var fl = document.getElementById('foeLbl');
+  if(fl) fl.textContent = dualMode ? '对手主将：' : '挑战：';
+  /* 对手下拉：默认随机；选了谁下局就打谁（不能和你选的重复） */
   var fs2 = document.getElementById('foeSel');
   if(fs2){
     var cur = fs2.value;
     fs2.innerHTML = '<option value="rand">🎲 随机对手</option>' +
-      SG.HEROES.filter(function(h){ return h.id !== myHero; }).map(function(h){
+      SG.HEROES.filter(function(h){ return usedIds.indexOf(h.id) < 0; }).map(function(h){
         return '<option value="' + h.id + '">' + h.name + '（战力 ' + h.power + '）</option>';
       }).join('');
     fs2.value = cur;
     if(fs2.value !== cur) fs2.value = 'rand';
   }
 }
-function pick(id){ myHero = id; SFX.click(); renderPicks(); }
+function pick(id){
+  SFX.click();
+  if(dualMode){
+    var i = myDuo.indexOf(id);
+    if(i >= 0) myDuo.splice(i, 1);          /* 点已选中的取消（取消主将，副将自动升主将） */
+    else if(myDuo.length < 2) myDuo.push(id);
+    else myDuo[1] = id;                     /* 已满两位：第三个点谁谁顶替副将 */
+    renderPicks();
+    return;
+  }
+  myHero = id; renderPicks();
+}
+function setDual(){
+  if(window.MP && window.MP.on) return;     /* 联机对战走单将（服务器只收单个武将 id） */
+  dualMode = !dualMode;
+  if(dualMode){ myDuo = [myHero]; }         /* 开双将：当前武将先当主将 */
+  else if(myDuo.length){ myHero = myDuo[0]; }
+  var b = document.getElementById('btnDual');
+  if(b){ b.textContent = '🎭 双将模式：' + (dualMode ? '开' : '关'); b.className = dualMode ? 'pri' : ''; }
+  renderPicks();
+}
 function startGame(foeId){
   puzzleIdx = -1;                       /* 普通开局，摘掉闯关标记 */
+  if(window.MP && window.MP.on) dualMode = false;   /* 联机对战固定单将 */
+  if(dualMode && myDuo.length < 2) return;
   if(!foeId){
     var selEl = document.getElementById('foeSel');
     var v = selEl ? selEl.value : 'rand';
-    if(v && v !== 'rand' && v !== myHero && SG.HEROES.some(function(h){ return h.id === v; })){
+    if(dualMode){
+      /* 双将对手：下拉选的是对手主将，副将随机补位（都不和你重复） */
+      var pool = SG.HEROES.filter(function(h){ return myDuo.indexOf(h.id) < 0; });
+      var valid = v && v !== 'rand' && pool.some(function(h){ return h.id === v; });
+      var first = valid ? v : pool[Math.floor(Math.random()*pool.length)].id;
+      var rest = pool.filter(function(h){ return h.id !== first; });
+      foeId = [first, rest[Math.floor(Math.random()*rest.length)].id];
+    }else if(v && v !== 'rand' && v !== myHero && SG.HEROES.some(function(h){ return h.id === v; })){
       foeId = v;
     }else{
       var foe = SG.HEROES.filter(function(h){ return h.id !== myHero; });
@@ -1832,7 +1906,7 @@ function startGame(foeId){
     }
   }
   foeHero = foeId;
-  G = SG.newGame({ seed:(Math.random()*1e9)|0, p0:myHero, p1:foeId, aiLevel: aiLv });
+  G = SG.newGame({ seed:(Math.random()*1e9)|0, p0:(dualMode ? myDuo.slice() : myHero), p1:foeId, aiLevel: aiLv });
   sel = [];
   recorded = false;
   document.getElementById('setup').style.display = 'none';
@@ -1865,12 +1939,24 @@ function face(pid){
   for(var i=0;i<pl.maxHp;i++) pips += '<span class="pip' + (i<pl.hp?'':' off') + '"></span>';
   var st = SUIT[pl.hero.faction] || SUIT.qun;
   var stc = st.c==='red' ? '#B03A2E' : (st.c==='black' ? '#3B332A' : (st.c==='shen' ? '#6D4C9F' : '#C86A27'));
-  return '<img class="face" src="' + ART[pl.hero.id] + '" alt="">' +
+  var faceHtml = pl.hero.dual
+    ? '<div class="face face2"><img src="' + ART[pl.hero.id] + '" alt=""><img src="' + ART[pl.hero.id2] + '" alt=""></div>'
+    : '<img class="face" src="' + ART[pl.hero.id] + '" alt="">';
+  var metaTxt;
+  if(pl.hero.dual){
+    var s2 = SUIT[pl.hero.factionB] || SUIT.qun;
+    var c2 = s2.c==='red' ? '#B03A2E' : (s2.c==='black' ? '#3B332A' : (s2.c==='shen' ? '#6D4C9F' : '#C86A27'));
+    metaTxt = '🎭 双将 ' + FCN[pl.hero.faction] + '·' + FCN[pl.hero.factionB] +
+      ' · <b style="color:' + stc + '">' + st.s + '</b><b style="color:' + c2 + '">' + s2.s +
+      '</b> 战力合 <b style="color:' + stc + '">' + pl.hero.power + '</b>';
+  }else{
+    metaTxt = FCN[pl.hero.faction] + ' · <b style="color:' + stc + '">' + st.s + ' 战力 ' + pl.hero.power + '</b>';
+  }
+  return faceHtml +
     '<div class="info"><div class="iname" style="color:' + FC[pl.hero.faction] + '">' + pl.name +
     (pid===0?'（你）':'（' + (mode==='ai' ? '电脑·' + AINAMES[aiLv] : '对手') + '）') +
     (pl.dying ? '<span style="color:#B03A2E;font-size:12px;"> ⚠️ 濒死求桃</span>' : '') + '</div>' +
-    '<div class="imeta">' + FCN[pl.hero.faction] + ' · <b style="color:' + stc + '">' +
-      st.s + ' 战力 ' + pl.hero.power + '</b> · ' + pl.hero.skills.map(function(s){return '【'+s.name+'】';}).join('') + '</div>' +
+    '<div class="imeta">' + metaTxt + ' · ' + pl.hero.skills.map(function(s){return '【'+s.name+'】';}).join('') + '</div>' +
     '<div class="hp">' + pips + '<span class="hnum">' + Math.max(0,pl.hp) + '/' + pl.maxHp + '</span></div>' +
     '<div class="iskill">' + pl.hero.skills.map(function(s){
         return '<b>【' + s.name + '】</b><span class="kind-tag ' + (s.kind || 'active') + '">' +
@@ -2041,6 +2127,7 @@ var ACHS = [
   { id:'comeback',  icon:'💪', name:'绝地反击', desc:'只剩 1 点体力时取胜' },
   { id:'flawless',  icon:'✨', name:'毫发无损', desc:'满血取胜' },
   { id:'david',     icon:'🎯', name:'以下克上', desc:'用战力点数低 3 点以上的武将取胜' },
+  { id:'duo_win',   icon:'🎭', name:'珠联璧合', desc:'双将模式赢一场' },
   { id:'collector', icon:'🏆', name:'武将收藏家', desc:'15 位武将各赢一场' },
   { id:'puzzler',   icon:'🧩', name:'破局者',   desc:'通关全部残局关卡' }
 ];
@@ -2053,7 +2140,9 @@ function recordResult(){
   if(win){ s.wins = (s.wins || 0) + 1; s.streak = (s.streak || 0) + 1; s.best = Math.max(s.best || 0, s.streak); }
   else{ s.streak = 0; }
   s.heroes = s.heroes || {};
-  var r = s.heroes[myHero] = s.heroes[myHero] || { w:0, l:0 };
+  /* 双将按组合记（键含 "+"），单将仍按武将记 */
+  var hkey = (dualMode && myDuo.length === 2) ? myDuo.join('+') : myHero;
+  var r = s.heroes[hkey] = s.heroes[hkey] || { w:0, l:0 };
   if(win) r.w++; else r.l++;
   if(win){
     var me = G.p[0], foe = G.p[1];
@@ -2065,6 +2154,7 @@ function recordResult(){
       }
     };
     unlock('first_win');
+    if(dualMode && myDuo.length === 2) unlock('duo_win');
     if(s.streak >= 3) unlock('streak3');
     if(s.streak >= 5) unlock('streak5');
     if(me.hp <= 1) unlock('comeback');
@@ -2092,6 +2182,18 @@ function showStats(){
       '<span class="stpower">' + h.power + '点</span>' +
       '<span>' + (n ? r.w + '胜' + r.l + '负' : '—') + '</span></div>';
   }).join('');
+  /* 双将组合战绩（键形如 "zhaoyun+machao"） */
+  var combos = [];
+  Object.keys(s.heroes || {}).forEach(function(k){
+    if(k.indexOf('+') < 0) return;
+    var names = k.split('+').map(function(id){
+      for(var j = 0; j < SG.HEROES.length; j++) if(SG.HEROES[j].id === id) return SG.HEROES[j].name;
+      return id;
+    }).join('·');
+    var rc = s.heroes[k];
+    combos.push('<div class="strow"><span class="stname">🎭 ' + names + '</span>' +
+      '<span>' + rc.w + '胜' + rc.l + '负</span></div>');
+  });
   var got = 0;
   var badges = ACHS.map(function(a){
     var ok = (s.ach || {})[a.id]; if(ok) got++;
@@ -2102,6 +2204,7 @@ function showStats(){
     '<p class="stsum">共 <b>' + g + '</b> 局 · 胜 <b>' + w + '</b>（' + rate + '%）· 当前连胜 <b>' +
     (s.streak || 0) + '</b> · 最高连胜 <b>' + (s.best || 0) + '</b></p>' +
     '<h3>武将战绩</h3><div class="strows">' + rows + '</div>' +
+    (combos.length ? '<h3>双将组合</h3><div class="strows">' + combos.join('') + '</div>' : '') +
     '<h3>成就徽章（' + got + '/' + ACHS.length + '）</h3><div class="badges">' + badges + '</div>';
   document.getElementById('statsOv').className = 'ov on';
 }
@@ -2519,6 +2622,14 @@ function again(){
 function rematch(same){
   if(same || (window.MP && window.MP.on)) return again();
   document.getElementById('ov').className = 'ov';
+  if(dualMode && myDuo.length === 2){
+    /* 双将换对手：重新随机一对（不和你重复） */
+    var pool = SG.HEROES.filter(function(h){ return myDuo.indexOf(h.id) < 0; });
+    var first = pool[Math.floor(Math.random()*pool.length)].id;
+    var rest = pool.filter(function(h){ return h.id !== first; });
+    startGame([first, rest[Math.floor(Math.random()*rest.length)].id]);
+    return;
+  }
   var foe = SG.HEROES.filter(function(h){ return h.id !== myHero && h.id !== foeHero; });
   startGame(foe[Math.floor(Math.random()*foe.length)].id);
 }
