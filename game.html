@@ -149,6 +149,17 @@ button:disabled{opacity:.4;cursor:not-allowed;}
 .pz span{font-size:12px;color:#6b665c;}
 .pz em{float:right;font-style:normal;font-size:12px;color:#3B7A3B;}
 .pz.locked{opacity:.55;cursor:not-allowed;background:#f3f0e9;}
+/* 过关斩将：关卡补给三选一 */
+.supply{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0 4px;}
+.sup{border:1px solid #d8d2c4;border-radius:12px;padding:12px 8px;background:#fff;cursor:pointer;text-align:center;}
+.sup:hover{border-color:#C9A227;background:#FBF6E8;}
+.sup b{display:block;font-size:15px;color:#31597E;margin-bottom:6px;}
+.sup span{display:block;font-size:11px;color:#6b665c;line-height:1.5;}
+.chrule{text-align:left;font-size:13px;line-height:1.8;color:#4a453a;}
+.chrule b{color:#B03A2E;}
+.chrec{display:inline-block;border:1px solid #C9A227;background:#FBF6E8;border-radius:10px;
+  padding:6px 14px;font-size:13px;color:#7a6218;margin:6px 0 10px;}
+@media(max-width:520px){ .supply{grid-template-columns:1fr;} }
 @keyframes bannerGo{
   0%{opacity:0;transform:scale(.6);}
   18%{opacity:1;transform:scale(1.08);}
@@ -251,7 +262,8 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   自己没有桃时，对手可以选择出桃相救。无人施救才真正阵亡。60 轮未分胜负判和。<br>
   <b>🎭 双将模式</b>：一次执两位武将，两套技能全部生效！体力上限 = 两人之和的一半（向上取整），
   出【杀】上限取两人较大值，战力点数 = 两人之和。<b>注意：双将之间有明显的克制关系，
-  总点数只是粗略参考</b>——多试几局，找到打得五五开的对手组合才是真的势均力敌。</p>
+  总点数只是粗略参考</b>——多试几局，找到打得五五开的对手组合才是真的势均力敌。<br>
+  <b>⚔ 过关斩将</b>：连闯 5 关的车轮战，体力继承、每关三选一补给，看你能走到第几关（成绩单独记录，不影响胜率）。</p>
 
   <div id="setup">
     <p id="pickTip" style="font-size:13px;margin-bottom:8px;">1. 选你的武将（点一下选中，可换人）</p>
@@ -275,6 +287,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
         <select id="foeSel" style="font-size:13px;padding:4px 6px;border-radius:6px;border:1px solid #c3beb0;max-width:150px;"></select>
       </span>
       <button class="pri" onclick="startGame()" id="btnStart">开始对战</button>
+      <button onclick="showChallenge()" id="btnCh">⚔ 过关斩将</button>
       <button onclick="showPuzzles()">🧩 闯关</button>
       <button onclick="showStats()">🏆 战绩</button>
     </div>
@@ -307,6 +320,28 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
     <button class="pri" id="ovBtnNext" onclick="nextPuzzle()">下一关</button>
     <button onclick="retryPuzzle()">重试本关</button>
     <button onclick="quitPuzzle()">返回选将</button>
+  </div>
+  <div id="ovBtnsChallenge" style="display:none;">
+    <div id="chBody"></div>
+    <div id="chBtns"></div>
+  </div>
+</div></div>
+
+<div class="ov" id="chOv"><div class="ovbox" style="max-width:520px;max-height:82vh;overflow-y:auto;">
+  <h2>⚔ 过关斩将</h2>
+  <div class="chrule">
+    连打 <b>5 关</b>，看看你能走多远：<br>
+    · 每关换一位对手，<b>越往后越强</b>，第 5 关是双将 Boss。<br>
+    · <b>体力继承</b>：打赢后剩下的体力带到下一关，不会回满；但过关会自动整备到至少 2 点。<br>
+    · <b>车轮战</b>：守关敌将也带伤上阵（起始体力 -1），双方都不轻松。<br>
+    · 每关获胜可<b>三选一补给</b>：🍑 休整回 2 血 / 🃏 粮草下关起手多 2 张 / 🎲 择敌重抽对手。<br>
+    · 中途落败即结束，最高关卡数会记下来，随时可以重头再挑战。<br>
+    · 挑战成绩单独记录，<b>不影响常规对战的胜率与连胜</b>。
+  </div>
+  <div id="chRec" class="chrec"></div>
+  <div style="text-align:center;margin-top:10px;">
+    <button class="pri" id="chStartBtn" onclick="startChallenge()">开始挑战</button>
+    <button onclick="closeChallenge()">再看看</button>
   </div>
 </div></div>
 
@@ -1885,7 +1920,8 @@ function setDual(){
   renderPicks();
 }
 function startGame(foeId){
-  puzzleIdx = -1;                       /* 普通开局，摘掉闯关标记 */
+  puzzleIdx = -1;                       /* 普通开局，摘掉闯关 / 挑战标记 */
+  ch = null;
   if(window.MP && window.MP.on) dualMode = false;   /* 联机对战固定单将 */
   if(dualMode && myDuo.length < 2) return;
   if(!foeId){
@@ -1916,7 +1952,7 @@ function startGame(foeId){
   if(mode==='ai') tick();
 }
 function backSetup(){
-  puzzleIdx = -1;                       /* 退回选将时摘掉闯关标记 */
+  puzzleIdx = -1;  ch = null;          /* 退回选将时摘掉闯关 / 挑战标记 */
   document.getElementById('setup').style.display = 'block';
   document.getElementById('board').style.display = 'none';
   G = null;
@@ -2072,7 +2108,7 @@ function closePuzzles(){ document.getElementById('puzzleOv').className = 'ov'; }
 function pzGo(i){ closePuzzles(); startPuzzle(i); }
 function startPuzzle(i){
   var P = PUZZLES[i];
-  puzzleIdx = i; mode = 'ai'; myHero = P.hero; aiLv = 1;
+  puzzleIdx = i; ch = null; mode = 'ai'; myHero = P.hero; aiLv = 1;
   G = SG.newGame({ seed: 42 + i, p0: P.hero, p1: P.foe, aiLevel: 1 });
   /* 把随机场面改写成设计好的残局 */
   G.deck = ['slash','dodge','peach','slash'];   /* 兜底牌堆，残局用不上 */
@@ -2098,6 +2134,105 @@ function nextPuzzle(){
   if(puzzleIdx + 1 < PUZZLES.length) startPuzzle(puzzleIdx + 1);
 }
 function quitPuzzle(){ puzzleIdx = -1; document.getElementById('ov').className = 'ov'; backSetup(); }
+
+/* ===== 过关斩将：5 关连胜挑战。局面靠 UI 层改写，引擎一行不动 =====
+   ch = null 表示普通模式；挑战中 ch = { stage, hp, maxHp, hero, aiLv,
+   foes(已打过的对手), supply(下关起手补牌), reroll, done, canSupply } */
+var CH_MAX = 5, CHKEY = 'sg_challenge_v1';
+var ch = null;
+function chLoad(){
+  try{
+    if(typeof localStorage === 'undefined') return { best:0, clears:0 };
+    var o = JSON.parse(localStorage.getItem(CHKEY) || 'null');
+    return (o && typeof o === 'object') ? { best:o.best||0, clears:o.clears||0 } : { best:0, clears:0 };
+  }catch(e){ return { best:0, clears:0 }; }
+}
+function chSave(o){
+  try{ if(typeof localStorage !== 'undefined') localStorage.setItem(CHKEY, JSON.stringify(o)); }catch(e){}
+}
+function chMainHero(){ return (ch.hero instanceof Array) ? ch.hero[0] : ch.hero; }
+/* 对手逐关变强：战力上限 6/8/10/12/不限，且不与自己、已打过的重复；末关双将 Boss */
+function chFoe(){
+  var caps = [6, 8, 10, 12, 99];
+  var cap = caps[Math.min(ch.stage, CH_MAX) - 1] || 99;
+  var used = ch.foes.concat(ch.hero instanceof Array ? ch.hero : [ch.hero]);
+  var pool = SG.HEROES.filter(function(h){ return h.power <= cap && used.indexOf(h.id) < 0; });
+  if(!pool.length) pool = SG.HEROES.filter(function(h){ return used.indexOf(h.id) < 0; });
+  if(!pool.length) pool = SG.HEROES.slice();
+  var a = pool[Math.floor(Math.random() * pool.length)];
+  if(ch.stage >= CH_MAX){
+    var rest = SG.HEROES.filter(function(h){ return h.id !== a.id && used.indexOf(h.id) < 0; });
+    if(!rest.length) rest = SG.HEROES.filter(function(h){ return h.id !== a.id; });
+    var b = rest[Math.floor(Math.random() * rest.length)];
+    return [a.id, b.id];
+  }
+  return a.id;
+}
+function showChallenge(){
+  var room = !!(window.MP && window.MP.on);
+  var r = chLoad();
+  document.getElementById('chRec').innerHTML = room
+    ? '联机房间里不能开挑战，先退出房间再来～'
+    : '最高纪录：第 <b>' + (r.best || 0) + '</b> 关 · 通关 <b>' + (r.clears || 0) + '</b> 次';
+  var go = document.getElementById('chStartBtn');
+  if(go) go.disabled = room;
+  document.getElementById('chOv').className = 'ov on';
+  SFX.click();
+}
+function closeChallenge(){ document.getElementById('chOv').className = 'ov'; }
+function startChallenge(){
+  closeChallenge();
+  document.getElementById('ov').className = 'ov';
+  ch = {
+    stage: 1, hp: null, maxHp: null,
+    hero: (dualMode && myDuo.length === 2) ? myDuo.slice() : myHero,
+    aiLv: aiLv, foes: [], supply: null, reroll: false, done: false, canSupply: false
+  };
+  puzzleIdx = -1; mode = 'ai';
+  startChStage();
+}
+function startChStage(){
+  var foe = chFoe();
+  if(ch.reroll){ foe = chFoe(); ch.reroll = false; }   /* 🎲 择敌：重抽一次 */
+  ch.foes = ch.foes.concat(foe instanceof Array ? foe : [foe]);
+  G = SG.newGame({ seed:(Math.random()*1e9)|0, p0:ch.hero, p1:foe, aiLevel:ch.aiLv });
+  ch.maxHp = G.p[0].maxHp;
+  if(ch.hp != null) G.p[0].hp = Math.max(1, Math.min(ch.hp, ch.maxHp));
+  ch.hp = G.p[0].hp;                                   /* 体力继承，低血进下一关 */
+  /* 车轮战平衡：我方体力不回满，守关敌将也带伤上阵（实测把通关率从 6% 拉到 ~20%） */
+  G.p[1].hp = Math.max(1, G.p[1].maxHp - 1);
+  if(ch.supply === 'draw'){
+    for(var i = 0; i < 2 && G.deck.length; i++) G.p[0].hand.push(G.deck.pop());
+  }
+  ch.supply = null; ch.done = false; ch.canSupply = false;
+  sel = []; recorded = true;                           /* 挑战不写常规战绩本 */
+  G.log = [{ t:'⚔ 第 ' + ch.stage + '/' + CH_MAX + ' 关：对手 ' + G.p[1].name +
+             (ch.stage >= CH_MAX ? '（双将 Boss）' : '') + ' · 带入体力 ' + ch.hp +
+             ' 点 · 守关敌将带伤（起始体力 -1）', who:-1 }]
+          .concat(G.log || []);
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('board').style.display = 'block';
+  SFX.start();
+  banner('第 ' + ch.stage + ' 关');
+  render();
+  if(mode === 'ai') tick();
+}
+/* 关卡胜利后三选一；补给只作用下一关，用完即清 */
+function pickSupply(k){
+  if(!ch || !ch.done || !ch.canSupply) return;
+  if(k === 'rest') ch.hp = Math.min(ch.maxHp, ch.hp + 2);
+  else if(k === 'draw') ch.supply = 'draw';
+  else ch.reroll = true;
+  ch.stage++;
+  document.getElementById('ov').className = 'ov';
+  startChStage();
+}
+function quitChallenge(){
+  ch = null;
+  document.getElementById('ov').className = 'ov';
+  backSetup();
+}
+
 /* 直接解锁一枚成就（不走对局结算），返回新解锁的成就对象或 null */
 function unlockAchDirect(id){
   var s = loadStats(); if(!s) return null;
@@ -2129,7 +2264,8 @@ var ACHS = [
   { id:'david',     icon:'🎯', name:'以下克上', desc:'用战力点数低 3 点以上的武将取胜' },
   { id:'duo_win',   icon:'🎭', name:'珠联璧合', desc:'双将模式赢一场' },
   { id:'collector', icon:'🏆', name:'武将收藏家', desc:'15 位武将各赢一场' },
-  { id:'puzzler',   icon:'🧩', name:'破局者',   desc:'通关全部残局关卡' }
+  { id:'puzzler',   icon:'🧩', name:'破局者',   desc:'通关全部残局关卡' },
+  { id:'conqueror', icon:'⚔', name:'过关斩将', desc:'五关连胜挑战通关一次' }
 ];
 var recorded = false;
 function recordResult(){
@@ -2200,9 +2336,12 @@ function showStats(){
     return '<div class="badge' + (ok ? ' got' : '') + '"><span class="bicon">' + a.icon + '</span>' +
       '<b>' + a.name + '</b><span class="bdesc">' + (ok ? '已解锁' : a.desc) + '</span></div>';
   }).join('');
+  var cr = chLoad();
   document.getElementById('statsBody').innerHTML =
     '<p class="stsum">共 <b>' + g + '</b> 局 · 胜 <b>' + w + '</b>（' + rate + '%）· 当前连胜 <b>' +
     (s.streak || 0) + '</b> · 最高连胜 <b>' + (s.best || 0) + '</b></p>' +
+    '<p class="stsum" style="margin-top:-8px;">⚔ 过关斩将：最高第 <b>' + (cr.best || 0) +
+    '</b> 关 · 通关 <b>' + (cr.clears || 0) + '</b> 次（挑战不计入上方胜率）</p>' +
     '<h3>武将战绩</h3><div class="strows">' + rows + '</div>' +
     (combos.length ? '<h3>双将组合</h3><div class="strows">' + combos.join('') + '</div>' : '') +
     '<h3>成就徽章（' + got + '/' + ACHS.length + '）</h3><div class="badges">' + badges + '</div>';
@@ -2250,8 +2389,9 @@ function render(){
 
   /* 牌堆余量（联机模式服务器不下发牌堆，自动隐藏） */
   var di = document.getElementById('deckInfo');
-  if(di) di.innerHTML = (G.deck && G.discard) ?
-    '牌堆 <b>' + G.deck.length + '</b> 张 · 弃牌堆 ' + G.discard.length + ' 张' : '';
+  if(di) di.innerHTML = (ch ? '<b style="color:#B03A2E;">⚔ 第 ' + ch.stage + '/' + CH_MAX + ' 关</b> · ' : '') +
+    ((G.deck && G.discard) ?
+      '牌堆 <b>' + G.deck.length + '</b> 张 · 弃牌堆 ' + G.discard.length + ' 张' : '');
 
   document.getElementById('sideTop').className = 'side' + (SG.active(G)===1?' act':'');
   document.getElementById('sideTop').innerHTML = face(1);
@@ -2270,6 +2410,8 @@ function render(){
 
   if(G.over){
     var bn = document.getElementById('ovBtnsNormal'), bp = document.getElementById('ovBtnsPuzzle');
+    var bc = document.getElementById('ovBtnsChallenge');
+    if(bc) bc.style.display = 'none';
     if(puzzleIdx >= 0){
       /* 闯关结算：不进战绩本；赢了推进进度，末关通关解锁成就 */
       recorded = true;
@@ -2288,6 +2430,50 @@ function render(){
       if(nb) nb.style.display = (pzWin && puzzleIdx < PUZZLES.length - 1) ? '' : 'none';
       if(bn) bn.style.display = 'none';
       if(bp) bp.style.display = '';
+      document.getElementById('ov').className = 'ov on';
+      return;
+    }
+    if(ch){
+      /* 挑战结算：不进常规战绩本；赢了继承体力、刷新纪录，末关解锁成就 */
+      recorded = true;
+      var cWin = (G.winner === 0), achHtml2 = '', rec2 = chLoad();
+      if(!ch.done){
+        ch.done = true;
+        if(cWin){
+          ch.hp = Math.min(ch.maxHp, Math.max(2, G.p[0].hp));   /* 过关保底整备到 2 点 */
+          if(ch.stage > (rec2.best || 0)) rec2.best = ch.stage;
+          if(ch.stage >= CH_MAX){
+            rec2.clears = (rec2.clears || 0) + 1;
+            var cAch = unlockAchDirect('conqueror');
+            if(cAch) achHtml2 = '🎉 新成就：' + cAch.icon + ' ' + cAch.name;
+          }
+          chSave(rec2);
+        }
+      }
+      ch.canSupply = cWin && ch.stage < CH_MAX;
+      document.getElementById('ovTitle').textContent =
+        cWin ? (ch.stage >= CH_MAX ? '⚔ 五关全胜！' : '⚔ 第 ' + ch.stage + ' 关 · 获胜！')
+             : '⚔ 止步第 ' + ch.stage + ' 关';
+      document.getElementById('ovText').textContent = (G.overReason || '') +
+        (cWin ? '　带入下一关体力 ' + ch.hp + '/' + ch.maxHp + ' 点'
+              : '　最高纪录：第 ' + (rec2.best || 0) + ' 关');
+      document.getElementById('ovAch').innerHTML = achHtml2;
+      document.getElementById('chBody').innerHTML = ch.canSupply
+        ? '<p style="font-size:13px;color:#6b665c;margin:4px 0;">打赢了！挑一份补给带去下一关：</p>' +
+          '<div class="supply">' +
+            '<div class="sup" onclick="pickSupply(\'rest\')"><b>🍑 休整</b><span>回复 2 点体力<br>（不超过体力上限）</span></div>' +
+            '<div class="sup" onclick="pickSupply(\'draw\')"><b>🃏 粮草</b><span>下一关起手<br>多摸 2 张牌</span></div>' +
+            '<div class="sup" onclick="pickSupply(\'reroll\')"><b>🎲 择敌</b><span>重抽下一关<br>的对手</span></div>' +
+          '</div>'
+        : (cWin ? '<p style="font-size:13px;color:#6b665c;">连过五关，这位武将可以写进家谱了。</p>'
+                : '<p style="font-size:13px;color:#6b665c;">越往后体力越紧，换套补给思路再来一次？</p>');
+      document.getElementById('chBtns').innerHTML = ch.canSupply
+        ? '<button onclick="quitChallenge()">见好就收 · 返回选将</button>'
+        : '<button class="pri" onclick="startChallenge()">再挑战一次</button>' +
+          '<button onclick="quitChallenge()">返回选将</button>';
+      if(bn) bn.style.display = 'none';
+      if(bp) bp.style.display = 'none';
+      if(bc) bc.style.display = '';
       document.getElementById('ov').className = 'ov on';
       return;
     }
