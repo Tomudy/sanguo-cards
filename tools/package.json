@@ -1,0 +1,13 @@
+{
+  "name": "sanguo-cards-voice",
+  "version": "1.0.0",
+  "private": true,
+  "description": "三国杀亲子版语音素材生成工具（微软 Edge 在线神经 TTS，无需账号与密钥）",
+  "scripts": {
+    "voice": "node build-voice.cjs",
+    "voice:force": "node build-voice.cjs --force"
+  },
+  "dependencies": {
+    "msedge-tts": "^2.1.1"
+  }
+}

@@ -2857,6 +2857,17 @@ function unlockAudio(){
       speechSynthesis.speak(u);
     }
   }catch(e){}
+  /* HTMLAudioElement 同理：手势内播一段静音解锁。失败也无妨，
+     speak() 会自动回退到浏览器 TTS，不会出现"点了完全没声"。 */
+  if(_vAudioOK && !_vWarmed){
+    _vWarmed = true;
+    try{
+      var a = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
+      a.volume = 0;
+      var pa = a.play();
+      if(pa && pa.catch) pa.catch(function(){});
+    }catch(e){}
+  }
 }
 (function(){
   var evs = ['touchstart', 'mousedown', 'click', 'keydown'];
@@ -2940,9 +2951,14 @@ function bgmTick(){
 }
 function toggleMute(){ muted = !muted; document.getElementById('muteTxt').textContent = muted ? '关' : '开'; }
 
-/* ===== 语音播报：浏览器中文 TTS，压低音高 + 放慢语速模拟武侠旁白 =====
-   不加载任何音频文件；没有中文 TTS 的设备自动静默，不影响游戏。 */
+/* ===== 语音播报 =====
+   优先播放 art/voice/ 下的本地音频（微软 Edge 神经 TTS 批量生成的云健男声），
+   音频缺失 / 浏览器拒绝播放时自动回退到浏览器自带中文 TTS（压低音高、放慢语速）。
+   音频是本地文件，游戏运行时完全不联网。文件名由 voiceKey() 生成，
+   必须与 tools/build-voice.cjs 里的同名函数一致（tests/voice-file.test.js 会对账）。 */
 var voiceOn = true, _vLast = 0, _vVoice = null;
+var _vAudioOK = (typeof Audio !== 'undefined'), _vBlocked = false, _vWarmed = false;
+var _vMiss = {}, _vQueue = [], _vPlaying = false, _vAud = null;
 function _vsyn(){
   try{ return (typeof speechSynthesis !== 'undefined') ? speechSynthesis : null; }catch(e){ return null; }
 }
@@ -2985,13 +3001,18 @@ var VOICE_LINE = {
   '青釭剑':'青釭出鞘', '青龙偃月刀':'青龙偃月', '古锭刀':'古锭刀出',
   '八卦阵':'八卦阵起', '白银狮子':'白银狮子', '护心镜':'护心镜护体'
 };
-function speak(text){
-  if(!voiceOn || !text) return;
+/* 中文台词 → 纯 ASCII 文件名：逐字符取 UTF-16 码点的 4 位十六进制。
+   tools/build-voice.cjs 用完全相同的规则，改这里必须同步改脚本。 */
+function voiceKey(text){
+  var s = '', i;
+  for(i = 0; i < text.length; i++){
+    s += ('0000' + text.charCodeAt(i).toString(16)).slice(-4);
+  }
+  return s;
+}
+/* 兜底：浏览器自带中文 TTS（没有音频文件、或浏览器拒绝播放音频时走这里） */
+function _vFallback(line){
   var syn = _vsyn(); if(!syn) return;
-  var now = Date.now();
-  if(now - _vLast < 260) return;          /* 连打时别叠成噪音 */
-  _vLast = now;
-  var line = VOICE_LINE[text] || text;    /* 技能名换成江湖台词 */
   try{
     syn.cancel();                          /* 新播报打断旧的，保持利落 */
     var u = new SpeechSynthesisUtterance(line);
@@ -3002,10 +3023,58 @@ function speak(text){
     syn.speak(u);
   }catch(e){}
 }
+/* 队列播放：一条播完再放下一条，避免 1~2 秒的音频被下一句截断 */
+function _vPump(){
+  if(_vPlaying || !voiceOn) return;
+  var line = _vQueue.shift();
+  if(!line) return;
+  _vPlaying = true;
+  var done = false;
+  var finish = function(){
+    if(done) return;
+    done = true; _vPlaying = false;
+    if(voiceOn) _vPump();
+  };
+  var fail = function(){
+    if(done) return;
+    done = true; _vPlaying = false;
+    _vMiss[line] = 1;                     /* 缺文件就别反复 404，直接回退 TTS */
+    if(voiceOn) _vFallback(line);
+    _vPump();
+  };
+  try{
+    if(!_vAud) _vAud = new Audio();
+    _vAud.onended = finish;
+    _vAud.onerror = fail;
+    _vAud.pause();
+    _vAud.src = 'art/voice/v_' + voiceKey(line) + '.mp3';
+    var p = _vAud.play();
+    /* iOS 未解锁 / 浏览器禁用自动播放：本局改走 TTS，不反复尝试 */
+    if(p && p.catch) p.catch(function(){ _vBlocked = true; fail(); });
+  }catch(e){ fail(); }
+}
+function speak(text){
+  if(!voiceOn || !text) return;
+  var now = Date.now();
+  if(now - _vLast < 260) return;          /* 连打时别叠成噪音 */
+  _vLast = now;
+  var line = VOICE_LINE[text] || text;    /* 技能名换成江湖台词 */
+  if(_vAudioOK && !_vBlocked && !_vMiss[line]){
+    if(_vQueue.length < 2) _vQueue.push(line);   /* 最多排队 2 条，别让语音滞后画面 */
+    _vPump();
+  }else{
+    _vFallback(line);
+  }
+}
 function toggleVoice(){
   voiceOn = !voiceOn;
   document.getElementById('voiceTxt').textContent = voiceOn ? '开' : '关';
-  if(!voiceOn){ try{ var syn = _vsyn(); if(syn) syn.cancel(); }catch(e){} }
+  if(!voiceOn){
+    _vQueue.length = 0;
+    _vPlaying = false;
+    if(_vAud){ try{ _vAud.pause(); }catch(e){} }
+    try{ var syn = _vsyn(); if(syn) syn.cancel(); }catch(e){}
+  }
   else speak('语音已开启');
 }
 function startBgm(){
