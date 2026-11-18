@@ -71,6 +71,7 @@ DISCONNECT_TIMEOUT = 180        # 玩家掉线后保留座位 / 对局的秒数�
 AI_STEP_DELAY = 0.55            # 电脑出牌间隔（秒），留出看清节奏的时间
 ROOM_IDLE_TIMEOUT = 1800        # 无人在线的房间多久后回收（秒）
 SSE_PING_INTERVAL = 5           # SSE 心跳间隔（秒）：对端彻底失联时的兜底探测
+STATIC_CACHE = "public, max-age=3600"   # 立绘/音频缓存 1 小时，配 ETag 条件请求（304）
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 START_TIME = time.time()
@@ -169,7 +170,10 @@ class EngineBridge:
         self.lock = threading.Lock()
         self.seq = 0
         self.stderr_tail = []
+        self.replies = queue.Queue()      # 读线程把解析后的响应放这里
+        self.broken = None                # 超时 / 崩溃后记录原因，后续 call 立刻失败
         threading.Thread(target=self._drain_stderr, daemon=True).start()
+        threading.Thread(target=self._drain_stdout, daemon=True).start()
 
     def _drain_stderr(self):
         try:
@@ -179,8 +183,37 @@ class EngineBridge:
         except Exception:
             pass
 
+    def _drain_stdout(self):
+        """独立读线程：阻塞的 stdout 读取只发生在这里，call() 用带超时的
+        Queue.get() 等待，timeout 才真正生效。
+        （Windows 的 select 只支持 socket、不支持管道，所以不能用 select 做超时。）"""
+        try:
+            for line in self.proc.stdout:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    self.replies.put(json.loads(line))
+                except ValueError:
+                    continue
+        except Exception:
+            pass
+        finally:
+            self.replies.put({"_eof": True})   # 进程退出时叫醒正在等待的 call()
+
+    def _kill_locked(self):
+        """已持有 self.lock：强制终止卡死的引擎，避免它继续占住房间锁。"""
+        try:
+            if self.proc.poll() is None:
+                self.proc.kill()
+                self.proc.wait(timeout=2)
+        except Exception:
+            pass
+
     def call(self, cmd, timeout=10, **kw):
         with self.lock:
+            if self.broken:
+                raise EngineError("引擎进程已不可用：%s" % self.broken)
             if self.proc.poll() is not None:
                 raise EngineError("引擎进程已退出：\n" + "\n".join(self.stderr_tail[-5:]))
             self.seq += 1
@@ -190,23 +223,29 @@ class EngineBridge:
                                                  ensure_ascii=False) + "\n")
                 self.proc.stdin.flush()
             except Exception as e:
+                self.broken = "写入失败：%s" % e
                 raise EngineError("向引擎进程写入失败：%s" % e)
 
             deadline = time.time() + timeout
-            while time.time() < deadline:
-                line = self.proc.stdout.readline()
-                if not line:
-                    raise EngineError("引擎进程无响应：\n" + "\n".join(self.stderr_tail[-5:]))
+            while True:
+                remain = deadline - time.time()
+                if remain <= 0:
+                    self.broken = "响应超时（%ss）" % timeout
+                    log("引擎响应超时，已终止卡死的进程（房间将结束本局）")
+                    self._kill_locked()
+                    raise EngineError("引擎响应超时（%ss），已终止卡死的引擎进程" % timeout)
                 try:
-                    res = json.loads(line)
-                except ValueError:
-                    continue
+                    res = self.replies.get(timeout=remain)
+                except queue.Empty:
+                    continue                      # 下一轮循环会命中 deadline
+                if res.get("_eof"):
+                    self.broken = "进程意外退出"
+                    raise EngineError("引擎进程无响应：\n" + "\n".join(self.stderr_tail[-5:]))
                 if res.get("id") != req_id:
                     continue                      # 跳过历史残留行
                 if not res.get("ok"):
                     raise EngineError(res.get("error") or "引擎返回错误")
                 return res
-            raise EngineError("引擎响应超时（%ss）" % timeout)
 
     def close(self):
         try:
@@ -787,6 +826,7 @@ ACTIONS = {
 # ══════════════════════════════════════════════════════════════════
 MIME = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
         ".js": "application/javascript; charset=utf-8", ".png": "image/png",
+        ".webp": "image/webp",          # 压缩后的立绘；PNG 原图保留作打印/老浏览器兜底
         ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".svg": "image/svg+xml",
         ".ico": "image/x-icon", ".json": "application/json; charset=utf-8",
         # 语音播报音频（art/voice/），缺了 mp3 会被当成二进制流，平板端可能不播
@@ -821,13 +861,16 @@ class Handler(BaseHTTPRequestHandler):
         pass                                    # 静音默认访问日志
 
     # ---- 基础 ----
-    def _send(self, code, body, ctype):
+    def _send(self, code, body, ctype, cache=None, etag=None):
+        """动态响应（页面 / JSON / SSE）默认 no-store；静态资源传 cache + etag。"""
         if isinstance(body, str):
             body = body.encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", cache or "no-store")
+        if etag:
+            self.send_header("ETag", etag)
         self.end_headers()
         self.wfile.write(body)
 
@@ -866,9 +909,24 @@ class Handler(BaseHTTPRequestHandler):
         if not full.startswith(root) or not os.path.isfile(full):
             self._error("文件不存在：%s" % rel, 404)
             return
+        try:
+            st = os.stat(full)
+            etag = '"%x-%x"' % (int(st.st_mtime), st.st_size)
+        except OSError:
+            self._error("文件不存在：%s" % rel, 404)
+            return
+        # 条件命中：只回 304 头部，不重传 40MB 立绘 / 音频
+        if self.headers.get("If-None-Match") == etag:
+            self.send_response(304)
+            self.send_header("ETag", etag)
+            self.send_header("Cache-Control", STATIC_CACHE)
+            self.end_headers()
+            return
         with open(full, "rb") as f:
-            self._send(200, f.read(), MIME.get(os.path.splitext(full)[1].lower(),
-                                               "application/octet-stream"))
+            data = f.read()
+        self._send(200, data,
+                   MIME.get(os.path.splitext(full)[1].lower(), "application/octet-stream"),
+                   cache=STATIC_CACHE, etag=etag)
 
     # ---- SSE 下行 ----
     def _sse(self, query):

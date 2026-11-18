@@ -1786,12 +1786,25 @@ if (typeof module !== 'undefined') module.exports = SG;
 
 <script>
 /* ========== 界面层 ========== */
-var ART = { boy:'art/hero.png', baiyu:'art/strategist.png', qingluan:'art/archer.png',
-            gushan:'art/general.png', jiangwei:'art/jiangwei.png',
-            weiyan:'art/weiyan.png', zhouyu:'art/zhouyu.png', dengai:'art/dengai.png',
-            lvbu:'art/lvbu.png', zhaoyun:'art/zhaoyun.png',
-            zhugeliang:'art/zhugeliang.png', diaochan:'art/diaochan.png',
-            guanyu:'art/guanyu.png', zhangfei:'art/zhangfei.png', machao:'art/machao.png' };
+/* 立绘走 WebP（约为原 PNG 的 1/10，手机/iPad 进房不再拉 40MB）。
+   PNG 原图仍留在 art/ 里，供打印页 print.html 与不支持 WebP 的老 Safari 兜底。 */
+var ART = { boy:'art/hero.webp', baiyu:'art/strategist.webp', qingluan:'art/archer.webp',
+            gushan:'art/general.webp', jiangwei:'art/jiangwei.webp',
+            weiyan:'art/weiyan.webp', zhouyu:'art/zhouyu.webp', dengai:'art/dengai.webp',
+            lvbu:'art/lvbu.webp', zhaoyun:'art/zhaoyun.webp',
+            zhugeliang:'art/zhugeliang.webp', diaochan:'art/diaochan.webp',
+            guanyu:'art/guanyu.webp', zhangfei:'art/zhangfei.webp', machao:'art/machao.webp' };
+/* 老浏览器（iOS 13 及更早 Safari）不支持 WebP → 自动切回 .png。
+   无 canvas 的环境（Node 测试桩等）保持 WebP，不做回退。 */
+(function(){
+  try{
+    var c = document.createElement('canvas');
+    if(!c || !c.getContext) return;
+    if(c.toDataURL('image/webp').indexOf('data:image/webp') === 0) return;
+  }catch(e){ return; }
+  for(var k in ART) if(Object.prototype.hasOwnProperty.call(ART, k))
+    ART[k] = ART[k].replace(/\.webp$/, '.png');
+})();
 var FCN = { wei:'魏', shu:'蜀', wu:'吴', qun:'群', shen:'神', shi:'势' };
 /* 花色 = 势力（魏♠ 蜀♥ 吴♣ 群♦ 神★ 势◆） */
 var SUIT = { wei:{ s:'♠', c:'black' }, shu:{ s:'♥', c:'red' }, wu:{ s:'♣', c:'black' },
