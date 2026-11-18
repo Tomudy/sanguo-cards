@@ -7,6 +7,7 @@
     python lan_server.py                     # 默认 0.0.0.0:8765
     python lan_server.py --port 9000         # 换端口
     python lan_server.py --host 127.0.0.1    # 只允许本机（调试用）
+    python lan_server.py --password abc123    # 加一道进房口令（邀请链接会自带）
     python lan_server.py --help              # 全部参数
 
 同一 Wi-Fi 下：一台电脑跑本脚本 → 其他人用手机 / iPad 浏览器打开终端打印的地址
@@ -38,10 +39,14 @@
 接入点 4｜断线重连 —— 全局 CONNS 连接表 + 浏览器 token
     身份是 localStorage 里的 token；掉线重连自动回到原座位，
     超过 DISCONNECT_TIMEOUT 还没回来才判掉线结束对局。
+    token 由服务端签发（ISSUED 集合），客户端自报的陌生 token 会被换掉，
+    因此知道房间号也无法伪造身份抢座位；--password 可再加一道进房口令。
 """
 
 import argparse
 import copy
+import hashlib
+import hmac
 import json
 import os
 import queue
@@ -57,7 +62,7 @@ import threading
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, quote
 
 # ══════════════════════════════════════════════════════════════════
 # 配置项（一般只改这里）
@@ -258,6 +263,15 @@ class EngineBridge:
                 self.proc.kill()
             except Exception:
                 pass
+        # 三条管道都显式关闭：房间开多了才不会攒下未释放的 fd
+        # （超时路径会先 kill 进程，此时 poll() 已非 None，上面那个分支不会执行）
+        for name in ("stdin", "stdout", "stderr"):
+            try:
+                f = getattr(self.proc, name, None)
+                if f and not f.closed:
+                    f.close()
+            except Exception:
+                pass
         shutil.rmtree(self.dir, ignore_errors=True)
 
 
@@ -344,10 +358,29 @@ CONNS = {}                       # token -> set(Queue)：全局连接表（接�
 CONNS_LOCK = threading.RLock()
 ENGINE_JS = ""
 HERO_IDS = []
+PASSWORD = ""                    # 可选进房口令（--password）；空 = 行为与旧版完全一致
+ISSUED = set()                   # 服务端签发过的 token，防止客户端自造 token 冒名占座
+ISSUED_LOCK = threading.RLock()
 
 
 def log(msg):
     print("[%s] %s" % (time.strftime("%H:%M:%S"), msg), flush=True)
+
+
+def resolve_token(raw):
+    """只接受服务端签发的 token；客户端自报的陌生 token 会被换成新签发的。
+    这样即使知道别人的房间号，也无法伪造 token 抢占已有座位。"""
+    raw = (raw or "").strip()
+    with ISSUED_LOCK:
+        if raw and raw in ISSUED:
+            return raw
+        t = uuid.uuid4().hex
+        ISSUED.add(t)
+        return t
+
+
+def pw_ok(value):
+    return (not PASSWORD) or hmac.compare_digest(str(value or ""), PASSWORD)
 
 
 def idle_payload(message=""):
@@ -389,17 +422,18 @@ class Seat:
         self.ai = ai
         self.online = True
 
-    def public(self, idx):
+    def public(self, idx, host_token=None):
         return {"seat": idx, "name": self.name, "hero": self.hero,
                 "ready": self.ready, "online": self.online if not self.ai else True,
-                "ai": self.ai}
+                "ai": self.ai, "host": bool(host_token and self.token == host_token)}
 
 
 class Room:
     def __init__(self, code):
         self.code = code
         self.lock = threading.RLock()
-        self.seats = [None, None]        # 0 号位 = 房主，1 号位 = 挑战者 / 电脑
+        self.seats = [None, None]        # 座位固定：对局中绝不重排（视角脱敏绑定座位号）
+        self.host_token = None           # 当前房主；离开/掉线超时后转给另一位在线真人
         self.specs = {}                  # token -> 昵称（观战）
         self.status = "select"           # select | playing | over | closed
         self.state = None                # 引擎权威状态（接入点 2）
@@ -417,7 +451,29 @@ class Room:
         return -1
 
     def is_host(self, token):
-        return self.seat_of(token) == 0
+        return bool(token) and token == self.host_token and self.seat_of(token) >= 0
+
+    def host_seat(self):
+        return self.seat_of(self.host_token) if self.host_token else -1
+
+    def ensure_host(self):
+        """房主座位被清空（明确离开）时，把房主交给最早的在线真人。
+        掉线宽限期内不转移（座位还在、只是 online=False），由 watch_disconnect 超时后处理。"""
+        if self.host_token and self.seat_of(self.host_token) >= 0:
+            return None
+        return self._handover(None)
+
+    def handover_host(self, exclude=None):
+        """主动转移（掉线超时用）：交给除 exclude 外最早的在线真人。"""
+        return self._handover(exclude)
+
+    def _handover(self, exclude):
+        for s in self.seats:
+            if s and not s.ai and s.token != exclude and s.online and is_online(s.token):
+                self.host_token = s.token
+                return s.name
+        self.host_token = None
+        return None
 
     def members(self):
         """房间里的所有 token（含观战）。"""
@@ -440,22 +496,24 @@ class Room:
             self.bridge = None
 
     # ---- 广播（每个接收者一份，视角不同）----
-    def sync_payload(self, seat):
+    def sync_payload(self, seat, token=None):
         game = mask_state(self.state, seat) if self.state else None
+        host = (token == self.host_token) if token is not None else (seat == self.host_seat())
         return {
             "type": "sync", "code": self.code, "status": self.status,
-            "seat": seat, "host": (seat == 0),
-            "players": [s.public(i) for i, s in enumerate(self.seats) if s],
+            "seat": seat, "host": bool(host), "host_seat": self.host_seat(),
+            "players": [s.public(i, self.host_token) for i, s in enumerate(self.seats) if s],
             "spectators": len(self.specs), "game": game, "message": self.message,
         }
 
     def broadcast(self):
         with self.lock:
+            self.ensure_host()                # 房主座位空了就自动转移，保证每次下发身份一致
             tokens = self.members()
             for token in tokens:
                 if token.startswith("ai:"):
                     continue
-                payload = self.sync_payload(self.seat_of(token))
+                payload = self.sync_payload(self.seat_of(token), token)
                 send_to(token, payload)
             self.last_seen = time.time()
 
@@ -493,7 +551,7 @@ def on_connect(token, q):
             room.seats[seat].online = True
             if room.message.endswith("等待重连…"):
                 room.message = ""
-        q.put_nowait(room.sync_payload(seat))
+        q.put_nowait(room.sync_payload(seat, token))
         log("房间 %s：%s 连接%s" % (room.code, seat_label(room, seat), "(重连)" if seat >= 0 else ""))
     room.broadcast()
 
@@ -536,9 +594,15 @@ def watch_disconnect(room, seat):
     with room.lock:
         if room.status in ("playing", "select"):
             room.status = "closed"
+            s = room.seats[seat]
+            lost = s.token if s else None
+            newhost = room.handover_host(lost) if lost and lost == room.host_token else None
             room.message = "有玩家掉线超过 %d 秒，本局结束。" % DISCONNECT_TIMEOUT
+            if newhost:
+                room.message += "%s 现在是房主，可以点「再来一局」继续。" % newhost
             room.close_bridge()
-            log("房间 %s：掉线超时关闭" % room.code)
+            log("房间 %s：掉线超时关闭%s"
+                % (room.code, ("，房主转为 " + newhost) if newhost else ""))
     room.broadcast()
 
 
@@ -595,6 +659,7 @@ def act_create(token, msg):
         ROOMS[code] = room
     with room.lock:
         room.seats[0] = Seat(name, token)
+        room.host_token = token
     log("创建房间 %s（房主：%s）" % (code, name))
     return room
 
@@ -657,14 +722,15 @@ def act_add_ai(token, msg):
             raise Reject("只有房主能加电脑")
         if room.status == "playing":
             raise Reject("对局进行中，不能加电脑")
-        if room.seats[1] is not None:
-            raise Reject("1 号位已经有人了")
+        free = [i for i in (0, 1) if room.seats[i] is None]
+        if not free:
+            raise Reject("两个座位都有人了")
+        used = [x.hero for x in room.seats if x and x.hero]
         ai = Seat("电脑", "ai:" + uuid.uuid4().hex, ai=True)
-        pool = [h for h in HERO_IDS if h != (room.seats[0].hero if room.seats[0] else None)]
-        ai.hero = random.choice(pool or HERO_IDS)
+        ai.hero = random.choice([h for h in HERO_IDS if h not in used] or HERO_IDS)
         ai.ready = True
-        room.seats[1] = ai
-        log("房间 %s：房主加入电脑对手（%s）" % (room.code, ai.hero))
+        room.seats[free[0]] = ai
+        log("房间 %s：房主在 %d 号位加入电脑对手（%s）" % (room.code, free[0] + 1, ai.hero))
     return room
 
 
@@ -754,12 +820,17 @@ def act_leave(token, msg):
         if seat >= 0:
             s = room.seats[seat]
             name = s.name
+            was_host = (token == room.host_token)
             room.seats[seat] = None
             if room.status in ("playing", "over"):
                 room.status = "closed"
                 room.message = "%s 离开了对局。" % name
+            newhost = room.ensure_host() if was_host else None
+            if newhost:
+                room.message += "%s 现在是房主，可以点「再来一局」继续。" % newhost
             room.close_bridge()
-            log("房间 %s：%s 离开" % (room.code, name))
+            log("房间 %s：%s 离开%s" % (room.code, name,
+                ("，房主转为 " + newhost) if newhost else ""))
         room.specs.pop(token, None)
         humans = [s for s in room.seats if s and not s.ai]      # 只剩电脑也要回收
         if not humans:
@@ -774,13 +845,12 @@ def act_leave(token, msg):
 
 
 def kick_ai(room):
-    """轮到电脑就自动出牌（复用引擎自带的 aiStep）。"""
+    """轮到电脑就自动出牌（复用引擎自带的 aiStep）。电脑可能在任一座位。"""
     with room.lock:
         if room.status != "playing" or not room.state:
             return
-        if active_seat(room.state) != 1:
-            return
-        if not (room.seats[1] and room.seats[1].ai):
+        seat = active_seat(room.state)
+        if not (0 <= seat <= 1 and room.seats[seat] and room.seats[seat].ai):
             return
         if room.ai_thread and room.ai_thread.is_alive():
             return
@@ -794,7 +864,10 @@ def ai_loop(room):
         with room.lock:
             if room.status != "playing" or not room.state:
                 return
-            if active_seat(room.state) != 1:
+            seat = active_seat(room.state)
+            if not (0 <= seat <= 1 and room.seats[seat] and room.seats[seat].ai):
+                return
+            if not room.bridge:               # 房间被关闭/重开时 bridge 可能已释放
                 return
             try:
                 mv = room.bridge.call("ai").get("move") or {"t": "end"}
@@ -848,7 +921,10 @@ def served_page():
     if "</body>" not in html:
         raise SystemExit("错误：%s 结构不符合预期（缺少 </body>）" % path)
     html = html.replace("</head>", '<style id="mp-style">%s</style>\n</head>' % CLIENT_CSS, 1)
-    html = html.replace("</body>", "<script>\n%s\n</script>\n</body>" % CLIENT_JS, 1)
+    pw_flag = "true" if PASSWORD else "false"
+    html = html.replace("</body>",
+                        "<script>window.MP_PW_REQUIRED=%s;</script>\n"
+                        "<script>\n%s\n</script>\n</body>" % (pw_flag, CLIENT_JS), 1)
     _page_cache["html"] = html.encode("utf-8")
     return _page_cache["html"]
 
@@ -898,6 +974,25 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/events":
             self._sse(parse_qs(u.query))
             return
+        if path == "/api/qr":
+            # 只接受本服务的邀请链接，避免被当成任意二维码生成器滥用
+            text = (parse_qs(u.query).get("text") or [""])[0][:300]
+            if not re.match(r"^https?://[\w.\-]+(:\d+)?/", text):
+                self._error("二维码内容不是有效的邀请链接", 400)
+                return
+            svg = qr_svg(text)
+            if svg is None:
+                self._error("邀请链接太长（>106 字节），无法生成二维码", 400)
+                return
+            etag = '"%s"' % hashlib.md5(svg.encode("utf-8")).hexdigest()[:16]
+            if self.headers.get("If-None-Match") == etag:
+                self.send_response(304)
+                self.send_header("ETag", etag)
+                self.send_header("Cache-Control", STATIC_CACHE)
+                self.end_headers()
+                return
+            self._send(200, svg, "image/svg+xml", cache=STATIC_CACHE, etag=etag)
+            return
         if path.startswith("/art/"):
             self._static(path[len("/art/"):])
             return
@@ -930,7 +1025,10 @@ class Handler(BaseHTTPRequestHandler):
 
     # ---- SSE 下行 ----
     def _sse(self, query):
-        token = (query.get("token") or [""])[0].strip() or uuid.uuid4().hex
+        if not pw_ok((query.get("pw") or [""])[0]):
+            self._json({"ok": False, "error": "进房口令不对", "need_pw": True}, 403)
+            return
+        token = resolve_token((query.get("token") or [""])[0].strip())
         q = queue.Queue(maxsize=256)
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
@@ -991,7 +1089,11 @@ class Handler(BaseHTTPRequestHandler):
             self._error("请求格式错误（需要 JSON）", 400)
             return
 
-        token = (msg.get("token") or "").strip() or uuid.uuid4().hex
+        token = resolve_token(msg.get("token"))
+        if not pw_ok(msg.get("pw")):
+            self._json({"ok": False, "error": "进房口令不对",
+                        "need_pw": True, "token": token})
+            return
         kind = msg.get("type")
         fn = ACTIONS.get(kind)
         if not fn:
@@ -1046,6 +1148,193 @@ def lan_addresses():
     return sorted(ips)
 
 # ══════════════════════════════════════════════════════════════════
+# 二维码进房（纯标准库，不引入任何第三方依赖）
+#   byte 模式 / 纠错 L / 版本 1-5（都是单 RS 块）/ 固定掩码 0 / 无版本信息区
+#   只用来把「带房间号与口令的邀请链接」画成 SVG，容量 106 字节足够
+#   （http://192.168.1.23:8765/?room=ABCD&pw=abc123 约 50 字节）。
+#   矩阵实现已用成熟的 qrcode 库逐格比对验证，见 tests/lan_p1_test.py。
+# ══════════════════════════════════════════════════════════════════
+_GF_EXP = [0] * 512
+_GF_LOG = [0] * 256
+
+
+def _gf_init():
+    x = 1
+    for i in range(255):
+        _GF_EXP[i] = x
+        _GF_LOG[x] = i
+        x <<= 1
+        if x & 0x100:
+            x ^= 0x11D
+    for i in range(255, 512):
+        _GF_EXP[i] = _GF_EXP[i - 255]
+
+
+_gf_init()
+
+
+def _gf_mul(a, b):
+    if not a or not b:
+        return 0
+    return _GF_EXP[_GF_LOG[a] + _GF_LOG[b]]
+
+
+def _rs_divisor(degree):
+    """RS 生成多项式去掉最高项 1 后的系数（高次 -> 低次）。"""
+    coef = [0] * degree
+    coef[degree - 1] = 1
+    root = 1
+    for _ in range(degree):
+        for j in range(degree):
+            coef[j] = _gf_mul(coef[j], root)
+            if j + 1 < degree:
+                coef[j] ^= coef[j + 1]
+        root = _gf_mul(root, 2)
+    return coef
+
+
+def _rs_remainder(data, divisor):
+    out = [0] * len(divisor)
+    for b in data:
+        factor = b ^ out[0]
+        out = out[1:] + [0]
+        for i in range(len(out)):
+            out[i] ^= _gf_mul(divisor[i], factor)
+    return out
+
+
+# (版本, 数据码字数, 纠错码字数) —— L 级 1~5 版全是单块，无需交织
+_QR_V = ((1, 19, 7), (2, 34, 10), (3, 55, 15), (4, 80, 20), (5, 108, 26))
+
+
+def qr_matrix(text):
+    """把 text 编成 QR 二维布尔矩阵（True = 黑）；超过 106 字节返回 None。"""
+    raw = text.encode("utf-8")
+    chosen = None
+    for v, ndata, nec in _QR_V:
+        if 4 + 8 + 8 * len(raw) <= ndata * 8:
+            chosen = (v, ndata, nec)
+            break
+    if chosen is None:
+        return None
+    v, ndata, nec = chosen
+    bits = []
+
+    def put(val, width):
+        for i in range(width - 1, -1, -1):
+            bits.append((val >> i) & 1)
+
+    put(4, 4)                                   # byte 模式
+    put(len(raw), 8)                            # 版本 1-9 的字符计数是 8 位
+    for b in raw:
+        put(b, 8)
+    put(0, min(4, ndata * 8 - len(bits)))       # 终止符
+    while len(bits) % 8:
+        bits.append(0)
+    data = []
+    for i in range(0, len(bits), 8):
+        byte = 0
+        for b in bits[i:i + 8]:
+            byte = (byte << 1) | b
+        data.append(byte)
+    pad = (0xEC, 0x11)
+    k = 0
+    while len(data) < ndata:
+        data.append(pad[k % 2])
+        k += 1
+    code = data + _rs_remainder(data, _rs_divisor(nec))
+
+    size = 17 + 4 * v
+    mod = [[False] * size for _ in range(size)]
+    fn = [[False] * size for _ in range(size)]  # 功能图案占位（不参与数据/掩码）
+
+    def setf(x, y, dark):
+        if 0 <= x < size and 0 <= y < size:
+            mod[y][x] = bool(dark)
+            fn[y][x] = True
+
+    # timing（先画，随后 finder 会覆盖三个角）
+    for i in range(size):
+        setf(6, i, i % 2 == 0)
+        setf(i, 6, i % 2 == 0)
+
+    def finder(cx, cy):
+        for dy in range(-4, 5):
+            for dx in range(-4, 5):
+                d = max(abs(dx), abs(dy))
+                setf(cx + dx, cy + dy, d != 2 and d != 4)
+
+    finder(3, 3)
+    finder(size - 4, 3)
+    finder(3, size - 4)
+    if v >= 2:                                  # 2~5 版只有一个对齐图案
+        ax = ay = size - 7
+        for dy in range(-2, 3):
+            for dx in range(-2, 3):
+                setf(ax + dx, ay + dy, max(abs(dx), abs(dy)) != 1)
+
+    # 格式信息：纠错 L(01) + 掩码 0，BCH(15,5) 后异或 0x5412
+    fmt_data = (0x01 << 3) | 0
+    rem = fmt_data
+    for _ in range(10):
+        rem = (rem << 1) ^ ((rem >> 9) * 0x537)
+    fmt = ((fmt_data << 10) | rem) ^ 0x5412
+    fbit = lambda i: (fmt >> i) & 1
+    for i in range(6):
+        setf(8, i, fbit(i))                     # 第 8 列，行 0..5
+    setf(8, 7, fbit(6))
+    setf(8, 8, fbit(7))
+    setf(7, 8, fbit(8))                        # 第 8 行，列 7
+    for i in range(9, 15):
+        setf(14 - i, 8, fbit(i))                # 第 8 行，列 5..0
+    for i in range(8):
+        setf(size - 1 - i, 8, fbit(i))          # 第 8 行，右侧 8 格
+    for i in range(8, 15):
+        setf(8, size - 15 + i, fbit(i))         # 第 8 列，底部 7 格
+    setf(8, size - 8, True)                     # dark module
+
+    # 数据码字：从右下起，两两列一组蛇形向上/向下，跳过第 6 列与功能图案
+    bi = 0
+    col = size - 1
+    upward = True
+    while col > 0:
+        if col == 6:
+            col = 5
+        rows = range(size - 1, -1, -1) if upward else range(size)
+        for y in rows:
+            for x in (col, col - 1):
+                if not fn[y][x] and bi < len(code) * 8:
+                    mod[y][x] = bool((code[bi >> 3] >> (7 - (bi & 7))) & 1)
+                    bi += 1
+        upward = not upward
+        col -= 2
+    for y in range(size):                        # 掩码 0：(行+列) 偶数格取反
+        for x in range(size):
+            if not fn[y][x] and (y + x) % 2 == 0:
+                mod[y][x] = not mod[y][x]
+    return mod
+
+
+def qr_svg(text, scale=4, border=2):
+    m = qr_matrix(text)
+    if m is None:
+        return None
+    n = len(m)
+    total = (n + border * 2) * scale
+    # 所有黑块合成一个 path，比几百个 <rect> 小 3 倍（二维码会被房间条反复请求）
+    seg = []
+    for y, row in enumerate(m):
+        for x, dark in enumerate(row):
+            if dark:
+                seg.append("M%d %dh1v1h-1z" % (x + border, y + border))
+    return ('<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" '
+            'viewBox="0 0 %d %d" shape-rendering="crispEdges">'
+            '<rect width="100%%" height="100%%" fill="#fff"/>'
+            '<path d="%s" fill="#000"/></svg>'
+            % (total, total, n + border * 2, n + border * 2, "".join(seg)))
+
+
+# ══════════════════════════════════════════════════════════════════
 # 接入点 3：注入页面的联机外壳（大厅 UI + 5 个 monkey patch）
 # ══════════════════════════════════════════════════════════════════
 CLIENT_CSS = r"""
@@ -1075,6 +1364,10 @@ CLIENT_CSS = r"""
 #mpbar .seat.off{opacity:.55;}
 #mpbar .seat b{font-family:"KaiTi","STKaiti",serif;font-size:13px;}
 #mpbar .wait{font-size:12px;color:#8a857a;}
+#mpbar .qrline{display:flex;align-items:center;gap:10px;margin:2px 0 8px;}
+#mpbar .qrline img{width:88px;height:88px;flex:none;background:#fff;
+  border:1px solid #D8D3C6;border-radius:6px;shape-rendering:crispEdges;}
+#mpbar .qrtip{font-size:11.5px;color:#6b665c;line-height:1.7;}
 #mppill{position:fixed;left:8px;top:8px;z-index:900;background:rgba(251,246,234,.96);
   border:1px solid #D8D3C6;border-radius:999px;padding:6px 12px;font-size:11.5px;color:#6b665c;
   display:none;align-items:center;gap:8px;box-shadow:0 2px 10px rgba(0,0,0,.06);}
@@ -1094,6 +1387,8 @@ CLIENT_JS = r"""
 
   var MP = window.MP = {
     token: localStorage.getItem('mp_token') || '',
+    pw: new URLSearchParams(location.search).get('pw') || localStorage.getItem('mp_pw') || '',
+    pwRequired: !!window.MP_PW_REQUIRED,
     seat: -1, host: false, code: '', status: 'idle',
     players: [], spectators: 0, on: false, started: false, joined: false, lastTick: 0
   };
@@ -1117,12 +1412,25 @@ CLIENT_JS = r"""
   }
 
   // ── 传输：POST 上行 + SSE 下行（都在标准库里，不需要第三方库） ──
-  function api(payload) {
-    var body = JSON.stringify(Object.assign({ token: MP.token }, payload));
+  function setPw(p) {
+    MP.pw = String(p || '').trim();
+    if (MP.pw) localStorage.setItem('mp_pw', MP.pw);
+    else localStorage.removeItem('mp_pw');
+  }
+  function api(payload, retried) {
+    var body = JSON.stringify(Object.assign({ token: MP.token, pw: MP.pw }, payload));
     return fetch('/api/action', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body
     }).then(function (r) { return r.json(); }).then(function (d) {
       if (d && d.token) { MP.token = d.token; localStorage.setItem('mp_token', d.token); }
+      if (d && d.need_pw) {
+        if (retried) { err('进房口令不对，请刷新页面后重试'); window.busy = false; return null; }
+        var p = window.prompt('进房口令不对，请重新输入（问开服务器的那个人）：', MP.pw || '');
+        if (p === null) { err('需要进房口令才能加入'); window.busy = false; return null; }
+        setPw(p);
+        connect();                         // 用新口令重建 SSE
+        return api(payload, true);         // 重发刚才这一步
+      }
       if (d && d.error) { err(d.error); window.busy = false; }   // 被拒绝时解锁界面
       return d;
     }).catch(function () {
@@ -1134,8 +1442,11 @@ CLIENT_JS = r"""
 
   function connect() {
     if (typeof EventSource === 'undefined') { err('该浏览器不支持实时联机，请用 Chrome / Safari'); return; }
+    // 口令模式下没拿到口令就先不连 SSE，避免 403 反复重连；用户点按钮时输入
+    if (MP.pwRequired && !MP.pw) { net(false); return; }
     if (es) { try { es.close(); } catch (e) {} }
-    es = new EventSource('/api/events?token=' + encodeURIComponent(MP.token));
+    es = new EventSource('/api/events?token=' + encodeURIComponent(MP.token) +
+                         '&pw=' + encodeURIComponent(MP.pw));
     es.addEventListener('hello', function (e) {
       var d = JSON.parse(e.data);
       MP.token = d.token; localStorage.setItem('mp_token', d.token);
@@ -1216,6 +1527,7 @@ CLIENT_JS = r"""
       '<div class="gbox">' +
         '<h3>局域网联机</h3>' +
         '<p class="ghint">同一个 Wi-Fi 下：一人创建房间，把房间号或邀请链接发给大家就能一起玩。</p>' +
+        (MP.pwRequired ? '<p class="ghint">🔒 这台服务器设了进房口令，第一次点按钮时输入即可（链接里可自带）。</p>' : '') +
         '<label>你的名字</label><input id="mpname" maxlength="8" placeholder="如：爸爸 / 小明">' +
         '<div class="grow"><button class="pri" id="mpcreate">创建房间</button></div>' +
         '<label>已有房间号</label>' +
@@ -1265,6 +1577,10 @@ CLIENT_JS = r"""
     api(payload);                                  // 结果通过 SSE 推回来
   }
 
+  function inviteUrl() {
+    return location.origin + '/?room=' + MP.code +
+      (MP.pw ? '&pw=' + encodeURIComponent(MP.pw) : '');
+  }
   function playerByIdx(i) {
     return MP.players.filter(function (p) { return p.seat === i; })[0] || null;
   }
@@ -1288,6 +1604,7 @@ CLIENT_JS = r"""
           (p.online ? '' : ' off') + '"><b>' + tag + ' ' + esc(p.name) + '</b>' +
           (p.hero ? ' · ' + esc(heroName(p.hero)) : ' · 未选将') +
           (p.ready ? ' · 已准备' : '') + (p.ai ? ' · 电脑' : (p.online ? '' : ' · 掉线')) +
+          (p.host ? ' · 房主' : '') +
           '</div>';
       }
     }
@@ -1297,7 +1614,7 @@ CLIENT_JS = r"""
     var btns = '';
     if (MP.seat >= 0) {
       btns += '<button id="mpready">' + (me && me.ready ? '取消准备' : '准备') + '</button>';
-      if (MP.host && !playerByIdx(1)) btns += '<button id="mpai">加一台电脑</button>';
+      if (MP.host && !both) btns += '<button id="mpai">加一台电脑</button>';
       if (MP.host) {
         btns += '<button class="pri" id="mpstart"' +
           (both && allReady ? '' : ' disabled') + '>开始对战</button>';
@@ -1314,6 +1631,10 @@ CLIENT_JS = r"""
         '<div class="brow"><span>房间号</span><span class="code">' + esc(MP.code) + '</span>' +
           '<span class="copy" id="mpcopy">复制邀请链接</span></div>' +
         '<div class="seatline">' + rows + '</div>' +
+        '<div class="qrline"><img id="mpqr" alt="扫码进房" src="/api/qr?text=' +
+          encodeURIComponent(inviteUrl()) + '">' +
+          '<span class="qrtip">📱 手机扫这里直接进房<br>（链接已带房间号' +
+          (MP.pw ? '和进房口令' : '') + '，点「复制邀请链接」可发给家人）</span></div>' +
         '<div class="brow">' + btns + '</div>' +
       '</div>';
 
@@ -1325,7 +1646,7 @@ CLIENT_JS = r"""
     if (elStart) elStart.onclick = function () { api({ type: 'start' }); };
     var elCopy = $('mpcopy');
     if (elCopy) elCopy.onclick = function () {
-      var url = location.origin + '/?room=' + MP.code;
+      var url = inviteUrl();
       var done = function () {
         elCopy.textContent = '已复制';
         setTimeout(function () { elCopy.textContent = '复制邀请链接'; }, 1500);
@@ -1437,6 +1758,8 @@ def parse_args(argv):
     p = argparse.ArgumentParser(description="三国武将卡 · 局域网多人对战服务器")
     p.add_argument("--host", default=HOST, help="监听地址（默认 0.0.0.0 = 局域网可访问）")
     p.add_argument("--port", type=int, default=PORT, help="端口（默认 %d）" % PORT)
+    p.add_argument("--password", default="",
+                   help="可选进房口令；设了之后知道房间号也要口令才能进（不设则完全兼容旧版）")
     p.add_argument("--game", default=GAME_FILE, help="游戏页面文件名（默认 game.html）")
     p.add_argument("--ai-delay", type=float, default=AI_STEP_DELAY, help="电脑出牌间隔秒数")
     p.add_argument("--timeout", type=int, default=DISCONNECT_TIMEOUT,
@@ -1446,8 +1769,10 @@ def parse_args(argv):
 
 def main(argv=None):
     global HOST, PORT, GAME_FILE, ENGINE_JS, HERO_IDS, AI_STEP_DELAY, DISCONNECT_TIMEOUT
+    global PASSWORD
     args = parse_args(argv)
     HOST, PORT, GAME_FILE = args.host, args.port, args.game
+    PASSWORD = (args.password or "").strip()
     AI_STEP_DELAY, DISCONNECT_TIMEOUT = args.ai_delay, args.timeout
 
     try:
@@ -1485,20 +1810,31 @@ def main(argv=None):
 
     threading.Thread(target=cleanup_loop, daemon=True).start()
 
+    invite = ("/?pw=" + quote(PASSWORD)) if PASSWORD else ""
     print("=" * 64)
     print("三国武将卡 · 局域网对战已启动（%d 位武将可用；Ctrl+C 退出）" % len(HERO_IDS))
     print("-" * 64)
     if HOST in ("0.0.0.0", ""):
+        print("  监听范围：    所有网卡（0.0.0.0）—— 只在自家 Wi-Fi 下使用；")
+        print("                若电脑还连着公共 Wi-Fi / VPN / 虚拟网卡，请改用")
+        print("                --host <家庭 Wi-Fi 的 IP> 只监听一块网卡。")
         for ip in lan_addresses():
-            print("  局域网访问：  http://%s:%d" % (ip, PORT))
+            print("  局域网访问：  http://%s:%d%s" % (ip, PORT, invite))
     else:
-        print("  访问地址：    http://%s:%d" % (HOST, PORT))
+        print("  监听地址：    %s:%d（仅这一块网卡）" % (HOST, PORT))
+        print("  访问地址：    http://%s:%d%s" % (HOST, PORT, invite))
     print("  本机自测：    http://127.0.0.1:%d" % PORT)
+    if PASSWORD:
+        print("  进房口令：    %s（已启用；上面的链接自带口令，别外传）" % PASSWORD)
+    else:
+        print("  进房口令：    未设置 —— 同一网段知道房间号的人都能进来；")
+        print("                想加一道门槛就加 --password 你的口令")
     print("-" * 64)
     print("玩法：一人进页面点「创建房间」；其他人输入 4 位房间号加入。")
     print("      两位玩家都「准备」后，房主点「开始对战」。")
     print("      掉线 %d 秒内重连可回到原座位。" % DISCONNECT_TIMEOUT)
     print("=" * 64)
+    sys.stdout.flush()                 # 启动横幅立刻可见：双击 bat / 强制结束也不丢
 
     try:
         httpd.serve_forever()
